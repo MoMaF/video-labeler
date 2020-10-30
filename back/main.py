@@ -34,6 +34,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# In a cluster, how many images to show for each trajectory (max)
+ITEMS_PER_TRAJECTORY = 2
+
 # TODO: move these to config
 DATA_DIRS = [f"{os.environ['HOME']}/dev/facerec/data/*-data"]
 FILMS_PATH = f"{os.environ['HOME']}/dev/facerec/films"
@@ -82,6 +85,15 @@ def img_tag(movie_id: int, frame: int, box: List[int]):
     # Real example: kept-121614:003616_235_183_293_262.jpeg
     return f"{movie_id}:{str(frame).zfill(6)}" + "_{}_{}_{}_{}".format(*box)
 
+def split_evenly(items, split_n: int):
+    """Select evenly distributed split-n items from a list.
+    """
+    n = len(items)
+    if split_n >= n:
+        return items
+    step = n // (split_n - 1)
+    return [items[min(n - 1, m)] for m in range(0, n + step - 1, step)][:split_n]
+
 def read_datadirs(data_dirs):
     # Expand potential globs
     dirs = []
@@ -103,11 +115,13 @@ def read_datadirs(data_dirs):
     for dir in dirs:
         movie_id = int(os.path.basename(dir).split("-")[0])
         trajectories_file = os.path.join(dir, "trajectories.jsonl")
+        clusters_file = os.path.join(dir, "clusters.json")
         images_dir = os.path.join(dir, "images")
 
         _, _, images = next(os.walk(images_dir))
         images_set = set(images)
 
+        # Read all trajectories for this movie
         with open(trajectories_file, "r") as f:
             trajectories = [json.loads(line) for line in f]
             # Filter trajectories to have only boxes that have an image.
@@ -118,6 +132,32 @@ def read_datadirs(data_dirs):
                     if file_name in images_set:
                         valid_boxes.append((frame, box))
                 t["image_bbs"] = valid_boxes
+
+        # Read clusters corresponing to each trajectory
+        with open(clusters_file, "r") as f:
+            cluster_indices = json.load(f)["clusters"]
+            assert len(cluster_indices) == len(trajectories), "All trajectories need a cluster!"
+
+        # Compute better image lookup table for clusters
+        # Note: trajectories are implicitly indexed by their order in the list
+        # Cluster indices are assumed to be dense, from zero
+        clusters = {}
+        for ti, ci in enumerate(cluster_indices):
+            if ci not in clusters:
+                clusters[ci] = {
+                    "image_data": [],
+                    "n_trajectories": 0,
+                    "n_shown_images": 0,  # N images that will be send to the frontend
+                    "n_total_images": 0,  # Total images in related trajectories
+                }
+            trajectory = trajectories[ti]
+            # TODO: smarter selection of images to show?
+            image_bbs = split_evenly(trajectory["image_bbs"], ITEMS_PER_TRAJECTORY)
+            # Tuples in the list are: (trajectory_id, frame_index, bounding_box)
+            clusters[ci]["image_data"] += [(ti, *ib) for ib in image_bbs]
+            clusters[ci]["n_shown_images"] = len(clusters[ci]["image_data"])
+            clusters[ci]["n_total_images"] += len(trajectory["image_bbs"])
+            clusters[ci]["n_trajectories"] += 1
 
         # Filter to valid:
         # trajectories = [t for t in trajectories if (len(t["image_bbs"]) > 5)]
@@ -130,8 +170,8 @@ def read_datadirs(data_dirs):
             "id": movie_id,
             "path": dir,
             "movie_path": movie_path,
-            "trajectories": trajectories,
-            "n_trajectories": len(trajectories),
+            "clusters": clusters,
+            "n_clusters": len(clusters),
         }
         dir_data[movie_id] = data
 
@@ -144,6 +184,7 @@ dir_data = read_datadirs(DATA_DIRS)
 # Filter movies to those that have data
 movie_df = movie_df.loc[dir_data.keys()]
 movie_df["year"] = movie_df.year.astype(int)
+movie_df["n_clusters"] = movie_df.index.map(lambda movie_id: dir_data[movie_id]["n_clusters"])
 
 @app.get("/")
 def read_root():
@@ -237,14 +278,9 @@ def get_cluster_images(movie_id: int, cluster_id: int):
         images_status = {tag: (status == 1) for tag, status in annotation["images"]}
         label = annotation["label"]
 
-    t = dir_data[movie_id]["trajectories"][cluster_id]
-    image_urls = [
-        f"images/{img_tag(movie_id, frame, box)}.jpeg"
-        for frame, box in t["image_bbs"]
-    ]
-
+    cluster = dir_data[movie_id]["clusters"][cluster_id]
     images = []
-    for frame, box in t["image_bbs"]:
+    for _, frame, box in cluster["image_data"]:
         tag = img_tag(movie_id, frame, box)
         images.append({
             "url": f"images/{tag}.jpeg",
@@ -257,6 +293,7 @@ def get_cluster_images(movie_id: int, cluster_id: int):
         "cluster_id": cluster_id,
         "label": label,
         "images": images,
+        "n_trajectories": cluster["n_trajectories"],
     }
 
 @app.post("/faces/clusters/images/{movie_id}/{cluster_id}")

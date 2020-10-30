@@ -7,7 +7,7 @@ export const sidebarSlice = createSlice({
   name: 'sidebar',
   initialState: {
     loading: true,
-    movies: null,  // {name, id}
+    movies: null,  // {name, id, year, nClusters}
     selectedMovie: null,
   },
   reducers: {
@@ -31,7 +31,9 @@ const { setMovies, setSelectedMovie } = sidebarSlice.actions
 export const fetchMoviesAsync = () => dispatch => {
   axios.get(`http://localhost:5000/movies`)
     .then(response => {
-      const movies = response.data
+      const movies = response.data.map(({id, name, year, n_clusters}) => ({
+        id, name, year, nClusters: n_clusters
+      }))
       console.log("/movies response!")
       dispatch(setMovies({movies}))
     })

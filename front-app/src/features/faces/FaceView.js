@@ -5,6 +5,7 @@ import {
   sendClusterAsync,
   toggleImage,
   setSelectedActor,
+  selectProps,
 } from './facesSlice'
 import { setHoverItem } from '../hover_view/hoverSlice'
 import ListView from '../lists/ListView'
@@ -64,14 +65,15 @@ class FaceView extends Component {
     const {dispatch} = this.props
     if (event.key == "ArrowLeft" || event.key == "ArrowRight") {
       const add = event.key == "ArrowRight" ? 1 : -1
-      const {movieId, clusterId} = this.props
+      const {movieId, clusterId, nClusters} = this.props
 
       // Save data for current cluster
       const label = this.props.selectedActorId
       sendClusterAsync(movieId, clusterId, this.props.images, label)
 
       // Get data for next cluster
-      dispatch(fetchClusterAsync(movieId, clusterId + add))
+      const nextCluster = (nClusters + clusterId + add) % nClusters
+      dispatch(fetchClusterAsync(movieId, nextCluster))
     }
   }
 
@@ -89,7 +91,7 @@ class FaceView extends Component {
     if (this.props.loading) {
       return <Spinner />
     } else {
-      const {clusterId, images, actors} = this.props
+      const {clusterId, nClusters, images, actors} = this.props
       const imagesViews = images.map((imageData, i) => {
         const item = {
           name: "Frame " + imageData.frame_index,
@@ -106,7 +108,7 @@ class FaceView extends Component {
       return (
         <div className="faceview">
           <div className="faceview-info">
-            <h3>{`Cluster ID: ${clusterId}. Showing ${images.length} images.`}</h3>
+            <h3>{`Cluster ${(clusterId + 1)} / ${nClusters}`}</h3>
             <p>This is cool info nice.</p>
           </div>
           <div className="faces-container">
@@ -125,4 +127,4 @@ class FaceView extends Component {
   }
 }
 
-export default connect(state => state.faces)(FaceView)
+export default connect(selectProps)(FaceView)

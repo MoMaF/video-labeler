@@ -11,8 +11,8 @@
 
 .faceimg {
     display: inline-block;
-    width: 100px;
-    height: 100px;
+    width: 110px;
+    height: 110px;
     margin-left: 10px;
     margin-bottom: 10px;
 }
@@ -33,11 +33,11 @@
 }
 
 .selected-image {
-  border: 5px solid #66ff66;
+  border: 3px solid #66ff66;
 }
 
 .discarded-image {
-  border: 5px solid #ff3333;
+  border: 3px solid #ff3333;
 }
 
 /* Loader */
