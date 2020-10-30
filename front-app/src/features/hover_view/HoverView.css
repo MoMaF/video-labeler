@@ -1,0 +1,63 @@
+.hoverview {
+    position: fixed;
+    width: 100%;
+    height: 47.5%;
+    background-color: #FFFC;
+}
+
+.hoverview.top {
+    top: 0;
+    border-bottom: 1px solid #000A;
+}
+
+.hoverview.bottom {
+    bottom: 0;
+    border-top: 1px solid #000A;
+}
+
+.hover-image-container {
+    width: 30%;
+    height: 100%;
+    padding: 5px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    float: left;
+}
+
+.hover-image-container.wider {
+    width: 50%;
+}
+
+.hover-image-content {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+}
+
+.hover-image {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.hover-title {
+    position: absolute;
+    font-size: 42px;
+    font-weight: bold;
+    top: 10px;
+    left: 16px;
+	text-shadow: -1px 1px 2px #FFF,
+				  1px 1px 2px #FFF,
+				  1px -1px 0 #FFF,
+				  -1px -1px 0 #FFF;
+}
+
+.hover-empty-text {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}

@@ -1,58 +1,44 @@
-import React from 'react'
+import React, { Component } from 'react'
 import logo from './logo.svg'
 import { Counter } from './features/counter/Counter'
+import FaceView from './features/faces/FaceView'
+import Sidebar from './features/sidebar/Sidebar'
+import HoverView from './features/hover_view/HoverView'
+import {keyDown, keyUp} from './features/hover_view/hoverSlice'
+import store from './app/store'
 import './App.css'
 
-function App() {
-  return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <Counter />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <span>
-          <span>Learn </span>
-          <a
-            className="App-link"
-            href="https://reactjs.org/"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            React
-          </a>
-          <span>, </span>
-          <a
-            className="App-link"
-            href="https://redux.js.org/"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Redux
-          </a>
-          <span>, </span>
-          <a
-            className="App-link"
-            href="https://redux-toolkit.js.org/"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Redux Toolkit
-          </a>
-          ,<span> and </span>
-          <a
-            className="App-link"
-            href="https://react-redux.js.org/"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            React Redux
-          </a>
-        </span>
-      </header>
-    </div>
-  )
+const keyDownHelper = event => store.dispatch(keyDown({key: event.key}))
+const keyUpHelper = event => store.dispatch(keyUp({key: event.key}))
+
+class App extends Component {
+  componentDidMount() {
+    console.log("Mounted!")
+    document.addEventListener('keydown', keyDownHelper)
+    document.addEventListener('keyup', keyUpHelper)
+  }
+
+  componentWillUnmount() {
+    document.removeEventListener('keydown', keyDownHelper)
+    document.removeEventListener('keyup', keyUpHelper)
+  }
+
+  render() {
+    return (
+      <div className="app">
+        <HoverView />
+        <header>
+          <h3>Video corpus labeler</h3>
+        </header>
+        <div className="side-bar">
+          <Sidebar />
+        </div>
+        <div className="content">
+          <FaceView />
+        </div>
+      </div>
+    )
+  }
 }
 
 export default App
