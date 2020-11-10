@@ -28,11 +28,11 @@ RUN rm -f /etc/nginx/nginx.conf; rm -f /etc/nginx/sites-enabled/default
 # Add our own (lightly modified) configs
 COPY nginx/nginx.conf /etc/nginx/nginx.conf
 COPY nginx/nginx_mysite.conf /etc/nginx/sites-available/
+COPY nginx/ssl-params.conf /etc/nginx/
 RUN ln -s /etc/nginx/sites-available/nginx_mysite.conf /etc/nginx/sites-enabled/mysite
 
-# Check that the configs are valid
-RUN nginx -t
-
+# TODO: replace HTTP basic auth with something better
+COPY .htpasswd /etc/nginx/
 
 # -------------- 2. setup backend -----------------
 COPY ./back /app

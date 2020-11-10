@@ -1,6 +1,8 @@
 **/node_modules
 **/metadata
 **/__pycache__
+**/ssl
+**/db-data
 npm-debug.log
 .vscode
 *.pyc

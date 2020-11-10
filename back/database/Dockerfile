@@ -8,6 +8,7 @@ FROM postgres:13
 # ENV POSTGRES_PASSWORD=test - define password when starting
 ENV POSTGRES_USER=admin
 ENV POSTGRES_DB=db
+# Mount PGDATA to the host computer when running container.
 ENV PGDATA=/var/lib/postgresql/data
 
 COPY ./create.sql /docker-entrypoint-initdb.d/
