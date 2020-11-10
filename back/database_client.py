@@ -1,3 +1,6 @@
+from datetime import datetime
+from collections import defaultdict
+
 import psycopg2
 import psycopg2.extras
 import pandas as pd
@@ -57,7 +60,7 @@ class DatabaseClient:
 
     def get_annotations(self, movie_id, cluster_id):
         cursor = self.conn.cursor()
-        q1 = """SELECT id, label, n_images, created_on
+        q1 = """SELECT id, label, n_images, EXTRACT(EPOCH FROM created_on)
             FROM clusters
             WHERE movie_id = %s AND cluster_id = %s;
         """
@@ -80,6 +83,23 @@ class DatabaseClient:
             "created_on": created_on,
             "images": images,  # tuples (image_tag: str, status: int)
         }
+
+    def get_annotation_counts(self):
+        """Return count of how many clusters have been labeled, per movie.
+        """
+        q = """SELECT movie_id, COUNT(*)
+            FROM public.clusters
+            WHERE label IS NOT NULL
+            GROUP BY movie_id;
+        """
+
+        cursor = self.conn.cursor()
+        cursor.execute(q)
+
+        result = cursor.fetchall()
+
+        movie_counts = {movie_id: count for movie_id, count in result}
+        return defaultdict(int, movie_counts)
 
 
 if __name__ == "__main__":
