@@ -1,0 +1,6 @@
+fastapi
+aiofiles
+pandas
+psycopg2
+opencv-python
+uvicorn

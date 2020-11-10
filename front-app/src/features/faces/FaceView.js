@@ -13,6 +13,7 @@ import {
 import './FaceView.css'
 import { setHoverItem } from 'features/hover_view/hoverSlice'
 import ListView from 'features/lists/ListView'
+import backendUrl from 'app/backendUrl'
 
 dayjs.extend(relativeTime)
 dayjs.extend(utc)
@@ -125,7 +126,7 @@ class FaceView extends Component {
           images: [imageData.fullFrameUrl],
         }
         return <img
-          src={`http://localhost:5000/${imageData.url}`}
+          src={`${backendUrl}/${imageData.url}`}
           className={`faceimg ${(imageData.approved ? 'selected-image' : 'discarded-image')}`}
           onClick={this.handleImageClicked.bind(this, i)}
           onMouseEnter={this.handleElementEnter.bind(this, item)}

@@ -7,7 +7,6 @@ import io
 
 from fastapi import Body, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import Response, FileResponse, StreamingResponse
 import pandas as pd
@@ -21,6 +20,7 @@ app = FastAPI()
 db_client = DatabaseClient(
     user="admin",
     database="db",
+    host=os.environ.get("DB_HOST", "localhost"),
     password=os.environ["DB_PASSWORD"],
 )
 signal.signal(signal.SIGINT, db_client.close)
@@ -41,9 +41,9 @@ ITEMS_PER_TRAJECTORY = 2
 PREDICTION_MIN_P = 0.40
 
 # TODO: move these to config
-DATA_DIRS = [os.environ["DATA_DIRS"]]
-FILMS_DIR = os.environ["FILMS_DIR"]
-METADATA_DIR = os.environ["METADATA_DIR"]
+DATA_DIR = os.environ["DATA_DIR"].rstrip("/")
+FILMS_DIR = os.environ["FILMS_DIR"].rstrip("/")
+METADATA_DIR = os.environ["METADATA_DIR"].rstrip("/")
 
 def read_metadata(metadata_dir):
     # actors.csv contains data about movies, and which actors where in them.
@@ -89,11 +89,10 @@ def split_evenly(items, split_n: int):
     step = n // (split_n - 1)
     return [items[min(n - 1, m)] for m in range(0, n + step - 1, step)][:split_n]
 
-def read_datadirs(data_dirs):
+def read_datadirs(data_dir):
     # Expand potential globs
-    dirs = []
-    for data_dir_path in data_dirs:
-        dirs += glob.glob(data_dir_path)
+    # data_dir contains folders like 12345-data for each movie
+    dirs = glob.glob(f"{data_dir}/*-data")
 
     # Map movie ids to movie paths
     movie_path_map = {}
@@ -183,7 +182,7 @@ def read_datadirs(data_dirs):
 
 movie_df, actors_df, actor_images_df = read_metadata(METADATA_DIR)
 valid_actor_ids = set(actors_df.index.get_level_values("id"))
-dir_data = read_datadirs(DATA_DIRS)
+dir_data = read_datadirs(DATA_DIR)
 
 # Filter movies to those that have data
 movie_df = movie_df.loc[dir_data.keys()]

@@ -1,12 +1,13 @@
 import React, { Component } from 'react'
 import { connect } from 'react-redux'
 import './HoverView.css'
+import backendUrl from 'app/backendUrl'
 
 const urlToImage = (imageUrl, shouldMax, index) => {
   return (
     <div className={`hover-image-container ${shouldMax ? "wider" : ""}`}>
       <img
-        src={`http://localhost:5000/${imageUrl}`}
+        src={`${backendUrl}/${imageUrl}`}
         className="hover-image"
         key={`image-${imageUrl}-${index}`}
         alt={`Original URL: ${imageUrl}`}
