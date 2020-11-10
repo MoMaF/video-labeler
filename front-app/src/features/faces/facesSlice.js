@@ -1,14 +1,17 @@
 import { createSlice } from '@reduxjs/toolkit'
-import axios from 'axios'
+import client from 'app/client'
 
 export const facesSlice = createSlice({
   name: 'faces',
   initialState: {
     loading: true,
     clusterId: null,
+    clusterDirty: null,
+    labelTime: null, // integer, time in milliseconds
     images: [], // {url, approved}
     actors: [], // {id, name}
     selectedActorId: null, // label
+    predictedActors: [], // list of actor ids (int)
   },
   reducers: {
     setCluster: (state, action) => {
@@ -17,13 +20,20 @@ export const facesSlice = createSlice({
       // which detects changes to a "draft state" and produces a brand new
       // immutable state based off those changes
       state.loading = false
+      state.clusterDirty = false
       state.clusterId = action.payload.clusterId
       state.images = action.payload.images
+      state.predictedActors = action.payload.predictedActors
+      const hasTime = !!action.payload.labelTime
+      state.labelTime = hasTime ? action.payload.labelTime * 1000 : null
     },
     setActors: (state, action) => {
       state.actors = action.payload.actors
     },
     setSelectedActor: (state, action) => {
+      if (action.payload.markDirty) {
+        state.clusterDirty = true
+      }
       if (state.selectedActorId === action.payload.selectedActorId) {
         state.selectedActorId = null
       } else {
@@ -31,6 +41,9 @@ export const facesSlice = createSlice({
       }
     },
     toggleImage: (state, action) => {
+      if (action.payload.markDirty) {
+        state.clusterDirty = true
+      }
       const i = action.payload.imageIndex
       state.images[i].approved = !state.images[i].approved
     }
@@ -46,27 +59,24 @@ export const { toggleImage, setActors, setSelectedActor } = facesSlice.actions
 // code can then be executed and other actions can be dispatched
 // /faces/clusters/images/{movie_id}/{cluster_id}
 export const fetchClusterAsync = (movieId, clusterId) => dispatch => {
-  axios.get(`http://localhost:5000/faces/clusters/images/${movieId}/${clusterId}`)
+  client.get(`faces/clusters/images/${movieId}/${clusterId}`)
     .then(response => {
-      const {images, label} = response.data
-      dispatch(setCluster({
-        clusterId,
-        images,
-      }))
-      dispatch(setSelectedActor({selectedActorId: label}))
+      const cluster = response.data
+      dispatch(setCluster(cluster))
+      const selectedActor = {selectedActorId: cluster.label, markDirty: false}
+      dispatch(setSelectedActor(selectedActor))
     })
 }
 
 export const sendClusterAsync = (movieId, clusterId, images, label) => {
-  axios.post(
-    `http://localhost:5000/faces/clusters/images/${movieId}/${clusterId}`,
-    {label, images},
-  ).then(_ => console.log("Send data for cluster: " + clusterId))
-  .catch(_ => console.log("FAILED for cluster: " + clusterId))
+  const data = {label, images}
+  client.post(`faces/clusters/images/${movieId}/${clusterId}`, data)
+    .then(_ => console.log("Send data for cluster: " + clusterId))
+    .catch(_ => console.log("FAILED for cluster: " + clusterId))
 }
 
 export const fetchActorsAsync = movieId => dispatch => {
-  axios.get(`http://localhost:5000/actors/${movieId}`)
+  client.get(`actors/${movieId}`)
     .then(response => {
       const actors = response.data
       dispatch(setActors({actors}))
@@ -76,10 +86,19 @@ export const fetchActorsAsync = movieId => dispatch => {
 // The function below is called a selector and allows us to select a value from
 // the state. Selectors can also be defined inline where they're used instead of
 // in the slice file. For example: `useSelector((state) => state.counter.value)`
-export const selectProps = state => ({
-  ...state.faces,
-  movieId: state.sidebar.selectedMovie ? state.sidebar.selectedMovie.id : null,
-  nClusters: state.sidebar.selectedMovie ? state.sidebar.selectedMovie.nClusters : null,
-})
+export const selectProps = state => {
+  const hasMovieSelected = state.sidebar.selectedMovie !== null
+  const movieId = hasMovieSelected ? state.sidebar.selectedMovie.id : null
+  const nClusters = hasMovieSelected ? state.sidebar.selectedMovie.nClusters : null
+
+  const {predictedActors, ...faces} = state.faces
+  const hasPredictions = faces.clusterId !== null && predictedActors.length > 0
+  const actors = faces.actors.map(actorData => ({
+    ...actorData,
+    predicted: hasPredictions && predictedActors.includes(actorData.id),
+  }))
+
+  return {...faces, movieId, nClusters, actors}
+}
 
 export default facesSlice.reducer

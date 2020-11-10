@@ -1,6 +1,4 @@
 import React, { Component } from 'react'
-import logo from './logo.svg'
-import { Counter } from './features/counter/Counter'
 import FaceView from './features/faces/FaceView'
 import Sidebar from './features/sidebar/Sidebar'
 import HoverView from './features/hover_view/HoverView'
@@ -13,7 +11,6 @@ const keyUpHelper = event => store.dispatch(keyUp({key: event.key}))
 
 class App extends Component {
   componentDidMount() {
-    console.log("Mounted!")
     document.addEventListener('keydown', keyDownHelper)
     document.addEventListener('keyup', keyUpHelper)
   }

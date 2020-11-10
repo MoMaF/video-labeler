@@ -1,6 +1,6 @@
-import React, { useState, Component } from 'react'
-import { useSelector, useDispatch, connect } from 'react-redux'
-import ListView from '../lists/ListView'
+import React, { Component } from 'react'
+import { connect } from 'react-redux'
+import ListView from 'features/lists/ListView'
 import './Sidebar.css'
 
 import {fetchMoviesAsync, selectMovieAndFetch} from './sidebarSlice'
@@ -19,15 +19,25 @@ class Sidebar extends Component {
         }
 
         const n = this.props.movies.length
+        const movies = this.props.movies.map(movieItem => {
+            const percent = movieItem.nLabeledClusters / movieItem.nClusters * 100
+            return {
+                ...movieItem,
+                afterName: ` (${movieItem.year})`,
+                subTitle: `Labeled clusters: ${percent.toFixed(1)}%`
+            }
+        })
+
         const {dispatch} = this.props
         return (
             <div className="sidebar">
             <h3>List of Movies <span className="light-text">({n})</span></h3>
             <ListView
-                items={this.props.movies}
+                items={movies}
                 selectedItem={this.props.selectedMovie ? this.props.selectedMovie.id : null}
                 itemClicked={(movie, event) => {
                     dispatch(selectMovieAndFetch(movie))
+
                 }}
             />
             </div>

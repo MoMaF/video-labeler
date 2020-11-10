@@ -2,13 +2,14 @@ import React, { Component } from 'react'
 import { connect } from 'react-redux'
 import './HoverView.css'
 
-const urlToImage = (imageUrl, shouldMax) => {
+const urlToImage = (imageUrl, shouldMax, index) => {
   return (
     <div className={`hover-image-container ${shouldMax ? "wider" : ""}`}>
       <img
         src={`http://localhost:5000/${imageUrl}`}
         className="hover-image"
-        key={`image-${imageUrl}`}
+        key={`image-${imageUrl}-${index}`}
+        alt={`Original URL: ${imageUrl}`}
       />
     </div>
   )
@@ -29,7 +30,7 @@ class HoverView extends Component {
     if (hoverItem.imageUrls.length > 0) {
       content = (
         <div className="hover-image-content">
-          {hoverItem.imageUrls.slice(0, 3).map(url => urlToImage(url, max))}
+          {hoverItem.imageUrls.slice(0, 3).map((url, i) => urlToImage(url, max, i))}
         </div>
       )
     }

@@ -1,7 +1,7 @@
 import { createSlice } from '@reduxjs/toolkit'
-import axios from 'axios'
 
-import {fetchClusterAsync, fetchActorsAsync} from '../faces/facesSlice'
+import {fetchClusterAsync, fetchActorsAsync} from 'features/faces/facesSlice'
+import client from 'app/client'
 
 export const sidebarSlice = createSlice({
   name: 'sidebar',
@@ -29,13 +29,14 @@ const { setMovies, setSelectedMovie } = sidebarSlice.actions
 // will call the thunk with the `dispatch` function as the first argument. Async
 // code can then be executed and other actions can be dispatched
 export const fetchMoviesAsync = () => dispatch => {
-  axios.get(`http://localhost:5000/movies`)
+  client.get('movies')
     .then(response => {
-      const movies = response.data.map(({id, name, year, n_clusters}) => ({
-        id, name, year, nClusters: n_clusters
-      }))
-      console.log("/movies response!")
+      const movies = response.data
       dispatch(setMovies({movies}))
+
+      if (movies && movies.length > 0) {
+        dispatch(selectMovieAndFetch(movies[0]))
+      }
     })
 }
 

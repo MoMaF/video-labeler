@@ -3,19 +3,49 @@
 }
 
 .list-child {
-    font-size: 1.25rem;
-    padding: 10px 16px;
     width: 100%;
+    padding: 10px 16px;
     border-bottom: 1px solid #DDD;
+}
+
+.list-child-header {
+    width: 100%;
+    font-size: 1.25rem;
+}
+
+.list-child-header>span {
+    color: #888;
+    font-weight: normal;
+}
+
+.list-child-header>span:empty {
+    display: none;
+}
+
+.list-child-subtitle {
+    padding-top: 4px;
+    width: 100%;
+    font-size: 0.85rem;
+    color: #888;
+}
+
+.list-child-subtitle:empty {
+    display: none;
 }
 
 .list-child.selected {
     background-color: #F0F0F0;
-    font-weight: bold;
 }
 
 .list-child.highlighted {
     background-color: #b5ffac;
+}
+
+.list-child-header.selected {
+    font-weight: bold;
+}
+
+.list-child-header.highlighted {
     font-weight: bold;
 }
 

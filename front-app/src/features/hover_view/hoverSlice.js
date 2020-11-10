@@ -9,7 +9,6 @@ export const hoverSlice = createSlice({
   },
   reducers: {
     keyDown: (state, action) => {
-      console.log(action.payload.key)
       state.pressedKeys[action.payload.key] = true
     },
     keyUp: (state, action) => {
