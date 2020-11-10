@@ -28,7 +28,7 @@ signal.signal(signal.SIGTERM, db_client.close)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost", "http://localhost:3000"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -37,12 +37,16 @@ app.add_middleware(
 # In a cluster, how many images to show for each trajectory (max)
 ITEMS_PER_TRAJECTORY = 2
 
+# Send predictions to frontend if probability is above this
+PREDICTION_MIN_P = 0.40
+
 # TODO: move these to config
-DATA_DIRS = [f"{os.environ['HOME']}/dev/facerec/data/*-data"]
-FILMS_PATH = f"{os.environ['HOME']}/dev/facerec/films"
-METADATA_DIR = f"{os.environ['HOME']}/dev/video-labels/metadata"
+DATA_DIRS = [os.environ["DATA_DIRS"]]
+FILMS_DIR = os.environ["FILMS_DIR"]
+METADATA_DIR = os.environ["METADATA_DIR"]
 
 def read_metadata(metadata_dir):
+    # actors.csv contains data about movies, and which actors where in them.
     actors_path = os.path.join(metadata_dir, "actors.csv")
     df = pd.read_csv(actors_path)
 
@@ -63,21 +67,12 @@ def read_metadata(metadata_dir):
     actors_df["id"] = actors_df.index.get_level_values("id")
     valid_actor_ids = set(actors_df.index.get_level_values("id"))
 
-    # Keep tabs on actor images in the backend
-    images_path = os.path.join(metadata_dir, "actor_images")
-    _, _, files = next(os.walk(images_path))
-    actor_images_map = {}
-    for image_file in files:
-        # Filename like: actor-123-movie-876-5.jpeg
-        basename = os.path.basename(image_file)
-        parts = basename.split("-")
-        if parts[0] == "actor" and int(parts[1]) in valid_actor_ids:
-            actor_id = int(parts[1])
-            if actor_id not in actor_images_map:
-                actor_images_map[actor_id] = []
-            actor_images_map[actor_id].append(basename)
+    # actor_images.csv links images to actors (and movies)
+    # Columns: index,actor_id,movie_id,filename
+    actor_images_path = os.path.join(metadata_dir, "actor_images.csv")
+    actor_images_df = pd.read_csv(actor_images_path, index_col="actor_id").sort_index()
 
-    return movie_df, actors_df, actor_images_map
+    return movie_df, actors_df, actor_images_df
 
 def img_tag(movie_id: int, frame: int, box: List[int]):
     """Get a 'standard' image tag as used by the face recognition stack.
@@ -102,11 +97,11 @@ def read_datadirs(data_dirs):
 
     # Map movie ids to movie paths
     movie_path_map = {}
-    _, _, movie_files = next(os.walk(FILMS_PATH))
-    for name in movie_files:
+    _, _, movie_files = next(os.walk(FILMS_DIR))
+    for name in sorted(movie_files):
         try:
             movie_id = int(name.split("-")[0])
-            movie_path_map[movie_id] = os.path.join(FILMS_PATH, name)
+            movie_path_map[movie_id] = os.path.join(FILMS_DIR, name)
         except:
             pass
 
@@ -116,6 +111,7 @@ def read_datadirs(data_dirs):
         movie_id = int(os.path.basename(dir).split("-")[0])
         trajectories_file = os.path.join(dir, "trajectories.jsonl")
         clusters_file = os.path.join(dir, "clusters.json")
+        predictions_file = os.path.join(dir, "predictions.json")
         images_dir = os.path.join(dir, "images")
 
         _, _, images = next(os.walk(images_dir))
@@ -159,8 +155,15 @@ def read_datadirs(data_dirs):
             clusters[ci]["n_total_images"] += len(trajectory["image_bbs"])
             clusters[ci]["n_trajectories"] += 1
 
-        # Filter to valid:
-        # trajectories = [t for t in trajectories if (len(t["image_bbs"]) > 5)]
+        # Read per-cluster predictions
+        with open(predictions_file, "r") as f:
+            predictions = json.load(f)
+            # Convert keys to integers (JSON only has string keys)
+            predictions = {
+                int(cluster_id): {int(actor_id): p for actor_id, p in cluster_preds.items()}
+                for cluster_id, cluster_preds in predictions.items()
+            }
+            assert len(predictions) == len(clusters), "Predictions not equal to clusters!"
 
         # Expect video file with the same name as directory (+ extension)
         assert movie_id in movie_path_map, f"Movie file not found for: {movie_id}"
@@ -172,12 +175,13 @@ def read_datadirs(data_dirs):
             "movie_path": movie_path,
             "clusters": clusters,
             "n_clusters": len(clusters),
+            "predictions": predictions,
         }
         dir_data[movie_id] = data
 
     return dir_data
 
-movie_df, actors_df, actor_images_map = read_metadata(METADATA_DIR)
+movie_df, actors_df, actor_images_df = read_metadata(METADATA_DIR)
 valid_actor_ids = set(actors_df.index.get_level_values("id"))
 dir_data = read_datadirs(DATA_DIRS)
 
@@ -186,25 +190,34 @@ movie_df = movie_df.loc[dir_data.keys()]
 movie_df["year"] = movie_df.year.astype(int)
 movie_df["n_clusters"] = movie_df.index.map(lambda movie_id: dir_data[movie_id]["n_clusters"])
 
-@app.get("/")
-def read_root():
-    return {"Hello": "World"}
-
-@app.get("/movies")
+@app.get("/api/movies")
 def list_movies():
-    json_str = movie_df.to_json(orient="records", force_ascii=False)
-    return Response(content=json_str, media_type="application/json")
+    # Get annotation counts from DB
+    movie_counts = db_client.get_annotation_counts()
+    return [{
+        "id": movie.id,
+        "name": movie.name,
+        "year": movie.year,
+        "n_clusters": movie.n_clusters,
+        "n_labeled_clusters": movie_counts[movie.id],
+    } for movie in movie_df.itertuples()]
 
-@app.get("/actors/{movie_id}")
+@app.get("/api/actors/{movie_id}")
 def list_actors(movie_id: int):
     df = actors_df.loc[movie_id]
     actors = []
     for actor in df.itertuples():
-        image_names = actor_images_map.get(actor.id, [])
+        image_names = []
+        if actor.id in actor_images_df.index:
+            sub_df = actor_images_df.loc[[actor.id]]
+            same_movie = (sub_df.movie_id == movie_id)
+            # Add images from the correct movie first.
+            image_names += sub_df[same_movie].filename.tolist()
+            image_names += sub_df[~same_movie].filename.tolist()
         actors.append({
             "id": actor.id,
             "name": actor.name,
-            "images": [f"images/{name}" for name in image_names],
+            "images": [f"images/actors/{name}" for name in image_names],
         })
     return actors
 
@@ -223,18 +236,23 @@ def get_frame(movie_id: int, frame_index: int):
     if not ret:
         return HTTPException(500, "Error reading movie.")
 
+    # Resize frames to that we can send them faster
+    MAX_SIZE = 512
+    max_frame_dim = max(frame.shape[:2])
+    if max_frame_dim > MAX_SIZE:
+        scale = MAX_SIZE / max_frame_dim
+        width, height = int(scale * frame.shape[1]), int(scale * frame.shape[0])
+        dim = (width, height)
+        frame = cv2.resize(frame, dim, interpolation=cv2.INTER_AREA)
+
     # Encode into jpeg in-memory
     encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 75]
     result, encimg = cv2.imencode(".jpg", frame, encode_param)
 
     return StreamingResponse(io.BytesIO(encimg.tobytes()), media_type="image/jpeg")
 
-@app.get("/images/actor-{actor_id}-movie-{remainder}.jpeg")
-def get_image(actor_id: int, remainder: str):
-    if actor_id not in valid_actor_ids:
-        return HTTPException(404, f"Unknown actor id {actor_id}.")
-
-    filename = f"actor-{actor_id}-movie-{remainder}.jpeg"
+@app.get("/images/actors/{filename}")
+def get_image(filename: str):
     file_path = os.path.join(METADATA_DIR, "actor_images", filename)
 
     if not os.path.exists(file_path):
@@ -265,20 +283,25 @@ def get_image(movie_id: int, label: str):
         headers={"Cache-Control": "max-age=3600"}
     )
 
-@app.get("/faces/clusters/images/{movie_id}/{cluster_id}")
+@app.get("/api/faces/clusters/images/{movie_id}/{cluster_id}")
 def get_cluster_images(movie_id: int, cluster_id: int):
     if movie_id not in movie_df.index:
         return HTTPException(404, f"Invalid movie id {movie_id}.")
 
+    movie_data = dir_data[movie_id]
+
     # Find potential labels for this cluster, in the database
     images_status = {}
     label = None
+    label_time = None
     annotation = db_client.get_annotations(movie_id, cluster_id)
-    if annotation:
+    if annotation is not None:
         images_status = {tag: (status == 1) for tag, status in annotation["images"]}
         label = annotation["label"]
+        label_time = int(annotation["created_on"])
 
-    cluster = dir_data[movie_id]["clusters"][cluster_id]
+    # Collect static data for each image
+    cluster = movie_data["clusters"][cluster_id]
     images = []
     for _, frame, box in cluster["image_data"]:
         tag = img_tag(movie_id, frame, box)
@@ -289,21 +312,27 @@ def get_cluster_images(movie_id: int, cluster_id: int):
             "frame_index": frame,
         })
 
+    # Expose prediction data for the API
+    preds = movie_data["predictions"][cluster_id]
+    predicted_actors = [actor_id for actor_id, p in preds.items() if p > PREDICTION_MIN_P]
+
     return {
         "cluster_id": cluster_id,
         "label": label,
+        "label_time": label_time,
         "images": images,
         "n_trajectories": cluster["n_trajectories"],
+        "predicted_actors": predicted_actors,
     }
 
-@app.post("/faces/clusters/images/{movie_id}/{cluster_id}")
+@app.post("/api/faces/clusters/images/{movie_id}/{cluster_id}")
 def set_cluster_labels(movie_id: int, cluster_id: int, data: ClusterLabels):
     # from images/{tag}.jpeg -> tag
     image_data = [(d.url[7:-5], int(d.approved)) for d in data.images]
     db_client.insert_annotations(movie_id, cluster_id, data.label, image_data)
     return {"status": "ok"}
 
-@app.get("/faces/clusters/labels/{cluster_id}")
+@app.get("/api/faces/clusters/labels/{cluster_id}")
 def get_cluster_labels(cluster_id: int):
     return {
         "cluster_id": cluster_id,
