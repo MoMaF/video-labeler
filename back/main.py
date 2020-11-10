@@ -220,7 +220,7 @@ def list_actors(movie_id: int):
         })
     return actors
 
-@app.get("/frames/{movie_id}/{frame_index}.jpeg")
+@app.get("/images/frames/{movie_id}/{frame_index}.jpeg")
 def get_frame(movie_id: int, frame_index: int):
     if not movie_id in dir_data:
         return HTTPException(404, f"No such movie {movie_id}.")
@@ -306,7 +306,7 @@ def get_cluster_images(movie_id: int, cluster_id: int):
         tag = img_tag(movie_id, frame, box)
         images.append({
             "url": f"images/{tag}.jpeg",
-            "full_frame_url": f"frames/{movie_id}/{frame}.jpeg",
+            "full_frame_url": f"images/frames/{movie_id}/{frame}.jpeg",
             "approved": images_status.get(tag, True),
             "frame_index": frame,
         })
