@@ -6,6 +6,9 @@ import {keyDown, keyUp} from './features/hover_view/hoverSlice'
 import store from './app/store'
 import './App.css'
 
+// Set REACT_APP_VERSION before running npm run start/build
+const { REACT_APP_VERSION: appVersion } = process.env
+
 const keyDownHelper = event => store.dispatch(keyDown({key: event.key}))
 const keyUpHelper = event => store.dispatch(keyUp({key: event.key}))
 
@@ -25,7 +28,16 @@ class App extends Component {
       <div className="app">
         <HoverView />
         <header>
-          <h3>Video corpus labeler</h3>
+          <div></div>
+          <div>
+            <h3>Video corpus labeler</h3>
+          </div>
+          <div>
+            <p className="version">
+              v{appVersion}<span> </span>
+              (<a href="https://gist.github.com/ekreutz/e35a8abe20d4018289f0d19086bcc435">instructions</a>)
+            </p>
+          </div>
         </header>
         <div className="side-bar">
           <Sidebar />

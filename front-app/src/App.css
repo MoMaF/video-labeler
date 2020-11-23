@@ -19,14 +19,19 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 header {
-  padding-left: 2rem;
+  padding: 0 16px;
   grid-area: header;
   background-color: #FEFEFE;
   border-bottom: 1px solid #CCC;
 
   display: flex;
-  justify-content: center;
+  flex-direction: row;
   align-items: center;
+  justify-content: space-between;
+}
+
+p.version {
+  color: #555;
 }
 
 .side-bar {
