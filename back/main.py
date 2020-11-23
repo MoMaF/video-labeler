@@ -34,6 +34,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# User TEMP
+USER = "momaf1"
+
 # In a cluster, how many images to show for each trajectory (max)
 ITEMS_PER_TRAJECTORY = 2
 
@@ -79,6 +82,15 @@ def img_tag(movie_id: int, frame: int, box: List[int]):
     """
     # Real example: kept-121614:003616_235_183_293_262.jpeg
     return f"{movie_id}:{str(frame).zfill(6)}" + "_{}_{}_{}_{}".format(*box)
+
+def parse_tag(tag: str):
+    """Parse 'standard' image tag and return Tuple[int, int, int, int, int]
+    with frame and box coordinates x1, y1, x2, y2 in one 5-tuple
+    """
+    # Real example of a tag: 121614:003616_235_183_293_262
+    movie_id, rest = tag.split(":", 1)
+    tuple_data = tuple(int(c) for c in rest.split("_"))
+    return tuple_data
 
 def split_evenly(items, split_n: int):
     """Select evenly distributed split-n items from a list.
@@ -137,6 +149,7 @@ def read_datadirs(data_dir):
         # Note: trajectories are implicitly indexed by their order in the list
         # Cluster indices are assumed to be dense, from zero
         clusters = {}
+        trajectory_map = {}
         for ti, ci in enumerate(cluster_indices):
             if ci not in clusters:
                 clusters[ci] = {
@@ -153,6 +166,9 @@ def read_datadirs(data_dir):
             clusters[ci]["n_shown_images"] = len(clusters[ci]["image_data"])
             clusters[ci]["n_total_images"] += len(trajectory["image_bbs"])
             clusters[ci]["n_trajectories"] += 1
+
+            # Uniquely map (frame, *box) -> trajectory id for every shown image
+            trajectory_map |= {tuple([frame, *box]): ti for frame, box in image_bbs}
 
         # Read per-cluster predictions
         with open(predictions_file, "r") as f:
@@ -175,6 +191,7 @@ def read_datadirs(data_dir):
             "clusters": clusters,
             "n_clusters": len(clusters),
             "predictions": predictions,
+            "trajectory_map": trajectory_map,
         }
         dir_data[movie_id] = data
 
@@ -293,9 +310,9 @@ def get_cluster_images(movie_id: int, cluster_id: int):
     images_status = {}
     label = None
     label_time = None
-    annotation = db_client.get_annotations(movie_id, cluster_id)
+    annotation = db_client.get_annotations(USER, movie_id, cluster_id)
     if annotation is not None:
-        images_status = {tag: (status == 1) for tag, status in annotation["images"]}
+        images_status = {tag: (status == "same") for tag, status in annotation["images"]}
         label = annotation["label"]
         label_time = int(annotation["created_on"])
 
@@ -326,9 +343,23 @@ def get_cluster_images(movie_id: int, cluster_id: int):
 
 @app.post("/api/faces/clusters/images/{movie_id}/{cluster_id}")
 def set_cluster_labels(movie_id: int, cluster_id: int, data: ClusterLabels):
-    # from images/{tag}.jpeg -> tag
-    image_data = [(d.url[7:-5], int(d.approved)) for d in data.images]
-    db_client.insert_annotations(movie_id, cluster_id, data.label, image_data)
+    if movie_id not in dir_data:
+        return HTTPException(404, f"Invalid movie id {movie_id}.")
+
+    movie_data = dir_data[movie_id]
+
+    image_data_db = []
+    for image in data.images:
+        # from images/{tag}.jpeg -> tag
+        tag = image.url[7:-5]
+        image_status = "same" if image.approved else "different"
+        frame_and_box = parse_tag(tag)
+        trajectory_id = movie_data["trajectory_map"][frame_and_box]
+        image_data_db.append((tag, image_status, trajectory_id))
+
+    status = "labeled"
+    time = 0
+    db_client.insert_annotations(USER, movie_id, cluster_id, data.label, image_data_db, status, time)
     return {"status": "ok"}
 
 @app.get("/api/faces/clusters/labels/{cluster_id}")

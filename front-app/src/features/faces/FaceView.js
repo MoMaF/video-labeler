@@ -41,8 +41,14 @@ class FaceView extends Component {
   }
 
   handleActorClicked(actor) {
+    let actorId = actor.id
+    // If same actor was clicked, toggle to null!
+    if (actorId === this.props.selectedActorId) {
+      actorId = null
+    }
+
     this.props.dispatch(setSelectedActor({
-      selectedActorId: actor.id, markDirty: true,
+      selectedActorId: actorId, markDirty: true,
     }))
   }
 

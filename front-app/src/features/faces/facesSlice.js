@@ -34,11 +34,7 @@ export const facesSlice = createSlice({
       if (action.payload.markDirty) {
         state.clusterDirty = true
       }
-      if (state.selectedActorId === action.payload.selectedActorId) {
-        state.selectedActorId = null
-      } else {
-        state.selectedActorId = action.payload.selectedActorId
-      }
+      state.selectedActorId = action.payload.selectedActorId
     },
     toggleImage: (state, action) => {
       if (action.payload.markDirty) {
