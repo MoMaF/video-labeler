@@ -44,7 +44,7 @@ p.version {
 .content {
   grid-area: content;
   background-color: #FFF;
-  padding-top: 16px;
+  overflow: hidden;
 }
 
 .App-logo {

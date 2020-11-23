@@ -152,20 +152,25 @@ class FaceView extends Component {
       })
       return (
         <div className="faceview">
-          <div className="faceview-info">
-            <h3>{`Cluster ${(clusterId + 1)} / ${nClusters}`}</h3>
-          <p>{labelTimeMsg}</p>
+          <div className="faceview-content">
+            <div className="faceview-info">
+              <h3>{`Cluster ${(clusterId + 1)} / ${nClusters}`}</h3>
+            <p>{labelTimeMsg}</p>
+            </div>
+            <div className="faces-container">
+              {imagesViews}
+            </div>
           </div>
-          <div className="faces-container">
-            {imagesViews}
+          <div className="faceview-list">
+            <h3>Selected actor/label:</h3>
+            <ListView
+              items={actors}
+              itemClicked={this.handleActorClicked}
+              selectedItem={this.props.selectedActorId}
+              onEnter={this.handleElementEnter}
+              onLeave={this.handleElementLeave}
+            />
           </div>
-          <ListView
-            items={actors}
-            itemClicked={this.handleActorClicked}
-            selectedItem={this.props.selectedActorId}
-            onEnter={this.handleElementEnter}
-            onLeave={this.handleElementLeave}
-          />
         </div>
       )
     }
