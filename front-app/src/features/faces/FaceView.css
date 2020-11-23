@@ -9,12 +9,29 @@
   height: 100%;
 }
 
+.faceimg-wrap {
+  position: relative;
+  display: inline-block;
+  width: 110px;
+  height: 110px;
+  margin-left: 10px;
+  margin-bottom: 10px;
+}
+
 .faceimg {
-    display: inline-block;
-    width: 110px;
-    height: 110px;
-    margin-left: 10px;
-    margin-bottom: 10px;
+  position: absolute;
+  z-index: 0;
+  display: inline-block;
+  width: 100%;
+  height: 100%;
+}
+
+.faceimg-border {
+  position: absolute;
+  z-index: 1;
+  display: inline-block;
+  width: 100%;
+  height: 100%;
 }
 
 .faceview-info {
@@ -32,11 +49,15 @@
   width: 30%;
 }
 
-.selected-image {
-  border: 3px solid #66ff66;
+.same-image {
+  border: 0px solid #fff;
 }
 
-.discarded-image {
+.different-image {
+  border: 3px solid #2023e2;
+}
+
+.invalid-image {
   border: 3px solid #ff3333;
 }
 

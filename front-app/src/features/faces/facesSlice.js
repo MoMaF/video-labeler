@@ -1,14 +1,17 @@
 import { createSlice } from '@reduxjs/toolkit'
 import client from 'app/client'
 
+const IMAGE_STATUSES = ["same", "different", "invalid"]
+
 export const facesSlice = createSlice({
   name: 'faces',
   initialState: {
     loading: true,
     clusterId: null,
     clusterDirty: null,
+    clusterShowTime: null,  // number, unix time in milliseconds when cluster appeared
     labelTime: null, // integer, time in milliseconds
-    images: [], // {url, approved}
+    images: [], // {url, status}
     actors: [], // {id, name}
     selectedActorId: null, // label
     predictedActors: [], // list of actor ids (int)
@@ -26,6 +29,7 @@ export const facesSlice = createSlice({
       state.predictedActors = action.payload.predictedActors
       const hasTime = !!action.payload.labelTime
       state.labelTime = hasTime ? action.payload.labelTime * 1000 : null
+      state.clusterShowTime = (new Date()).getTime()
     },
     setActors: (state, action) => {
       state.actors = action.payload.actors
@@ -41,7 +45,9 @@ export const facesSlice = createSlice({
         state.clusterDirty = true
       }
       const i = action.payload.imageIndex
-      state.images[i].approved = !state.images[i].approved
+      const currentIndex = IMAGE_STATUSES.findIndex(status => status === state.images[i].status)
+      const nextIndex = (IMAGE_STATUSES.length + currentIndex + 1) % IMAGE_STATUSES.length
+      state.images[i].status = IMAGE_STATUSES[nextIndex]
     }
   }
 })
@@ -64,8 +70,8 @@ export const fetchClusterAsync = (movieId, clusterId) => dispatch => {
     })
 }
 
-export const sendClusterAsync = (movieId, clusterId, images, label) => {
-  const data = {label, images}
+export const sendClusterAsync = (movieId, clusterId, images, label, time) => {
+  const data = {label, images, time, status: "labeled"}
   client.post(`faces/clusters/images/${movieId}/${clusterId}`, data)
     .then(_ => console.log("Send data for cluster: " + clusterId))
     .catch(_ => console.log("FAILED for cluster: " + clusterId))

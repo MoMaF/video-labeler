@@ -82,11 +82,13 @@ class FaceView extends Component {
 
       // Save data for current cluster
       if (this.props.clusterDirty) {
-        console.log("Cluster dirty: SENDDING")
+        console.log("Cluster dirty: SENDING TO DATABASE")
         const label = this.props.selectedActorId
-        sendClusterAsync(movieId, clusterId, this.props.images, label)
+        const startTime = this.props.clusterShowTime
+        const time = Math.round((new Date()).getTime() - startTime)
+        sendClusterAsync(movieId, clusterId, this.props.images, label, time)
       } else {
-        console.log("Cluster NOT IRTY")
+        console.log("Cluster NOT DIRTY")
       }
 
       // Get data for next cluster
@@ -131,15 +133,22 @@ class FaceView extends Component {
           name: "Frame " + imageData.frameIndex,
           images: [imageData.fullFrameUrl],
         }
-        return <img
-          src={`${backendUrl}/${imageData.url}`}
-          className={`faceimg ${(imageData.approved ? 'selected-image' : 'discarded-image')}`}
-          onClick={this.handleImageClicked.bind(this, i)}
-          onMouseEnter={this.handleElementEnter.bind(this, item)}
-          onMouseLeave={this.handleElementLeave.bind(this, item)}
-          key={imageData.url + i}
-          alt={`Original URL: ${imageData.url}`}
-        />
+        return (
+          <div
+            className="faceimg-wrap"
+            onClick={this.handleImageClicked.bind(this, i)}
+            onMouseEnter={this.handleElementEnter.bind(this, item)}
+            onMouseLeave={this.handleElementLeave.bind(this, item)}
+          >
+            <div className={`faceimg-border ${imageData.status}-image`}></div>
+            <img
+              src={`${backendUrl}/${imageData.url}`}
+              className="faceimg"
+              key={imageData.url + i}
+              alt={`Original URL: ${imageData.url}`}
+            />
+          </div>
+        )
       })
       return (
         <div className="faceview">

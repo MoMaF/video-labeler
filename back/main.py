@@ -4,8 +4,9 @@ import glob
 import json
 import signal
 import io
+import base64
 
-from fastapi import Body, FastAPI, HTTPException
+from fastapi import Body, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import Response, FileResponse, StreamingResponse
@@ -34,8 +35,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# User TEMP
-USER = "momaf1"
+# Username to use if no name was given by http basic auth
+DEFAULT_USER = "unknown"
 
 # In a cluster, how many images to show for each trajectory (max)
 ITEMS_PER_TRAJECTORY = 2
@@ -91,6 +92,20 @@ def parse_tag(tag: str):
     movie_id, rest = tag.split(":", 1)
     tuple_data = tuple(int(c) for c in rest.split("_"))
     return tuple_data
+
+def parse_user(request: Request):
+    """Parse the username out of a HTTPBasicAuth fastapi request.
+    """
+    username = DEFAULT_USER
+
+    if "authorization" in request.headers:
+        # Note: format is always like - Basic aGVsbG86d29ybGQ=
+        basic = request.headers["authorization"]
+        base64_part = basic[6:]
+        decoded = base64.b64decode(base64_part).decode("utf-8")
+        username, _ = decoded.split(":", 1)
+
+    return username
 
 def split_evenly(items, split_n: int):
     """Select evenly distributed split-n items from a list.
@@ -237,8 +252,8 @@ def list_actors(movie_id: int):
         })
     return actors
 
-@app.get("/images/frames/{movie_id}/{frame_index}.jpeg")
-def get_frame(movie_id: int, frame_index: int):
+@app.get("/images/frames/{movie_id}/{frame_index}_{box}.jpeg")
+def get_frame(movie_id: int, frame_index: int, box: str):
     if not movie_id in dir_data:
         return HTTPException(404, f"No such movie {movie_id}.")
 
@@ -247,10 +262,24 @@ def get_frame(movie_id: int, frame_index: int):
     if not cap.set(cv2.CAP_PROP_POS_FRAMES, frame_index):
         return HTTPException(400, "Bad request!")
 
+    box_split = box.split("-")
+    try:
+        box_split = [int(c) for c in box_split]
+    except:
+        return HTTPException(400, "Bad request!")
+
+    if len(box_split) != 4:
+        return HTTPException(400, "Bad request!")
+
     ret, frame = cap.read()
 
     if not ret:
         return HTTPException(500, "Error reading movie.")
+
+    # Draw bounding box on frame to highlight actor (color is BGR)
+    color = (255, 255, 255)
+    thickness = 2
+    frame = cv2.rectangle(frame, tuple(box_split[:2]), tuple(box_split[2:]), color, thickness)
 
     # Resize frames to that we can send them faster
     MAX_SIZE = 512
@@ -269,6 +298,10 @@ def get_frame(movie_id: int, frame_index: int):
 
 @app.get("/images/actors/{filename}")
 def get_image(filename: str):
+    # Filename can't contain directory separators
+    for sep in os.sep:
+        filename = filename.replace(sep, "")
+
     file_path = os.path.join(METADATA_DIR, "actor_images", filename)
 
     if not os.path.exists(file_path):
@@ -300,7 +333,7 @@ def get_image(movie_id: int, label: str):
     )
 
 @app.get("/api/faces/clusters/images/{movie_id}/{cluster_id}")
-def get_cluster_images(movie_id: int, cluster_id: int):
+def get_cluster_images(movie_id: int, cluster_id: int, request: Request):
     if movie_id not in movie_df.index:
         return HTTPException(404, f"Invalid movie id {movie_id}.")
 
@@ -308,11 +341,13 @@ def get_cluster_images(movie_id: int, cluster_id: int):
 
     # Find potential labels for this cluster, in the database
     images_status = {}
+    DEFAULT_STATUS = "same"
     label = None
     label_time = None
-    annotation = db_client.get_annotations(USER, movie_id, cluster_id)
+    username = parse_user(request)
+    annotation = db_client.get_annotations(username, movie_id, cluster_id)
     if annotation is not None:
-        images_status = {tag: (status == "same") for tag, status in annotation["images"]}
+        images_status = {tag: status for tag, status in annotation["images"]}
         label = annotation["label"]
         label_time = int(annotation["created_on"])
 
@@ -321,10 +356,11 @@ def get_cluster_images(movie_id: int, cluster_id: int):
     images = []
     for _, frame, box in cluster["image_data"]:
         tag = img_tag(movie_id, frame, box)
+        box_joined_str = "-".join(map(str, box))
         images.append({
             "url": f"images/{tag}.jpeg",
-            "full_frame_url": f"images/frames/{movie_id}/{frame}.jpeg",
-            "approved": images_status.get(tag, True),
+            "full_frame_url": f"images/frames/{movie_id}/{frame}_{box_joined_str}.jpeg",
+            "status": images_status.get(tag, DEFAULT_STATUS),
             "frame_index": frame,
         })
 
@@ -342,7 +378,7 @@ def get_cluster_images(movie_id: int, cluster_id: int):
     }
 
 @app.post("/api/faces/clusters/images/{movie_id}/{cluster_id}")
-def set_cluster_labels(movie_id: int, cluster_id: int, data: ClusterLabels):
+def set_cluster_labels(movie_id: int, cluster_id: int, data: ClusterLabels, request: Request):
     if movie_id not in dir_data:
         return HTTPException(404, f"Invalid movie id {movie_id}.")
 
@@ -352,22 +388,15 @@ def set_cluster_labels(movie_id: int, cluster_id: int, data: ClusterLabels):
     for image in data.images:
         # from images/{tag}.jpeg -> tag
         tag = image.url[7:-5]
-        image_status = "same" if image.approved else "different"
         frame_and_box = parse_tag(tag)
         trajectory_id = movie_data["trajectory_map"][frame_and_box]
-        image_data_db.append((tag, image_status, trajectory_id))
+        image_data_db.append((tag, image.status, trajectory_id))
 
-    status = "labeled"
-    time = 0
-    db_client.insert_annotations(USER, movie_id, cluster_id, data.label, image_data_db, status, time)
+    username = parse_user(request)
+    db_client.insert_annotations(
+        username, movie_id, cluster_id, data.label, image_data_db, data.status, data.time
+    )
     return {"status": "ok"}
-
-@app.get("/api/faces/clusters/labels/{cluster_id}")
-def get_cluster_labels(cluster_id: int):
-    return {
-        "cluster_id": cluster_id,
-        "classes": [{"name": name, "id": i, "p": 0.54} for i, name in enumerate(SOME_NAMES)]
-    }
 
 if __name__ == "__main__":
     import uvicorn
