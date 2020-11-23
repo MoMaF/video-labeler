@@ -93,12 +93,22 @@ export const selectProps = state => {
   const movieId = hasMovieSelected ? state.sidebar.selectedMovie.id : null
   const nClusters = hasMovieSelected ? state.sidebar.selectedMovie.nClusters : null
 
-  const {predictedActors, ...faces} = state.faces
-  const hasPredictions = faces.clusterId !== null && predictedActors.length > 0
-  const actors = faces.actors.map(actorData => ({
-    ...actorData,
-    predicted: hasPredictions && predictedActors.includes(actorData.id),
-  }))
+  const {predictedActors: predictedIds, ...faces} = state.faces
+  const hasPredictions = faces.clusterId !== null && predictedIds.length > 0
+
+  // Sort actor array to have predicted actors first
+  const predictedList = []
+  const othersList = []
+  for (let i = 0; i < faces.actors.length; ++i) {
+    const predicted = hasPredictions && predictedIds.includes(faces.actors[i].id)
+    const actorData = {...faces.actors[i], predicted}
+    if (predicted) {
+      predictedList.push(actorData)
+    } else {
+      othersList.push(actorData)
+    }
+  }
+  const actors = [...predictedList, ...othersList]
 
   return {...faces, movieId, nClusters, actors}
 }

@@ -248,6 +248,7 @@ def list_actors(movie_id: int):
         actors.append({
             "id": actor.id,
             "name": actor.name,
+            "role": actor.role,
             "images": [f"images/actors/{name}" for name in image_names],
         })
     return actors

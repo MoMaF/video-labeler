@@ -114,7 +114,8 @@ class FaceView extends Component {
       const {clusterId, nClusters, images, actors: rawActors, labelTime} = this.props
       const actors = rawActors.map(actor => ({
         ...actor,
-        subTitle: (actor.predicted ? "Predicted correct actor" : ""),
+        afterName: (actor.predicted ? " 🔮 (Predicted)" : ""),
+        subTitle: actor.role,
       }))
 
       let labelTimeMsg = 'No information about this cluster in the database.'
