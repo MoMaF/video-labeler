@@ -11,7 +11,7 @@ RUN npm run build
 
 # ----------------------------------
 # Main build stage - backend + nginx to serve the frontend
-FROM python:3.8-buster
+FROM python:3.9-buster
 
 # -------------- 1. setup nginx to serve frontend -----------------
 RUN apt-get update -y && apt-get install -y \
