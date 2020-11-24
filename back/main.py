@@ -363,8 +363,10 @@ def get_image(movie_id: int, label: str):
         headers={"Cache-Control": "max-age=3600"}
     )
 
-@app.get("/api/faces/clusters/images/{movie_id}/{cluster_id}")
-def get_cluster_images(movie_id: int, cluster_id: int, request: Request):
+@app.get("/api/faces/clusters/{movie_id}/{cluster_id}")
+def get_cluster_data(movie_id: int, cluster_id: int, request: Request):
+    """Main endpoint to get all data of a cluster.
+    """
     if movie_id not in movie_df.index:
         return HTTPException(404, f"Invalid movie id {movie_id}.")
 
@@ -416,8 +418,10 @@ def get_cluster_images(movie_id: int, cluster_id: int, request: Request):
         "predicted_actors": predicted_actors,
     }
 
-@app.post("/api/faces/clusters/images/{movie_id}/{cluster_id}")
-def set_cluster_labels(movie_id: int, cluster_id: int, data: ClusterLabels, request: Request):
+@app.post("/api/faces/clusters/{movie_id}/{cluster_id}")
+def set_cluster_data(movie_id: int, cluster_id: int, data: ClusterLabels, request: Request):
+    """Main endpoint to save cluster data to persistent storage. Eg. assign label.
+    """
     if movie_id not in dir_data:
         return HTTPException(404, f"Invalid movie id {movie_id}.")
 

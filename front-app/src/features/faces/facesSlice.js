@@ -72,9 +72,8 @@ export const { toggleImage, setActors, setSelectedActor, setStatus } = facesSlic
 // can be dispatched like a regular action: `dispatch(incrementAsync(10))`. This
 // will call the thunk with the `dispatch` function as the first argument. Async
 // code can then be executed and other actions can be dispatched
-// /faces/clusters/images/{movie_id}/{cluster_id}
 export const fetchClusterAsync = (movieId, clusterId) => dispatch => {
-  client.get(`faces/clusters/images/${movieId}/${clusterId}`)
+  client.get(`faces/clusters/${movieId}/${clusterId}`)
     .then(response => {
       const cluster = response.data
       dispatch(setCluster(cluster))
@@ -85,7 +84,7 @@ export const fetchClusterAsync = (movieId, clusterId) => dispatch => {
 
 export const sendClusterAsync = (movieId, cluster) => dispatch => {
   // Keys in cluster: label, images, time, status
-  client.post(`faces/clusters/images/${movieId}/${cluster.id}`, cluster)
+  client.post(`faces/clusters/${movieId}/${cluster.id}`, cluster)
     .then(_ => {
       console.log("Send data for cluster: " + cluster.id)
       dispatch(fetchMovieAsync(movieId))
