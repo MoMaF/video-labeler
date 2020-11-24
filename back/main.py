@@ -221,17 +221,41 @@ movie_df = movie_df.loc[dir_data.keys()]
 movie_df["year"] = movie_df.year.astype(int)
 movie_df["n_clusters"] = movie_df.index.map(lambda movie_id: dir_data[movie_id]["n_clusters"])
 
+def get_movie_data(movie_ids: List[int], movie_counts):
+    """Utility method to get movie data in a JSON-digestible format.
+    """
+    if not all(id in movie_df.index for id in movie_ids):
+        return None
+
+    return [{
+        "id": int(movie_df.at[id, "id"]),
+        "name": movie_df.at[id, "name"],
+        "year": int(movie_df.at[id, "year"]),
+        "n_clusters": int(movie_df.at[id, "n_clusters"]),
+        "n_labeled_clusters": movie_counts[id],
+    } for id in movie_ids]
+
+@app.get("/api/movies/{movie_id}")
+def get_movie(movie_id: int):
+    """Get metadata about a single movie.
+    """
+    movie_counts = db_client.get_annotation_counts(movie_id)
+    movie_data = get_movie_data([movie_id], movie_counts)
+
+    if movie_data is None:
+        return HTTPException(404, f"No such movie {movie_id}.")
+
+    return movie_data[0]
+
 @app.get("/api/movies")
 def list_movies():
-    # Get annotation counts from DB
+    """Get metadata about all movies available in the backend.
+    """
     movie_counts = db_client.get_annotation_counts()
-    return [{
-        "id": movie.id,
-        "name": movie.name,
-        "year": movie.year,
-        "n_clusters": movie.n_clusters,
-        "n_labeled_clusters": movie_counts[movie.id],
-    } for movie in movie_df.itertuples()]
+    all_movie_ids = movie_df.id.tolist()
+    movie_data = get_movie_data(all_movie_ids, movie_counts)
+
+    return movie_data
 
 @app.get("/api/actors/{movie_id}")
 def list_actors(movie_id: int):
@@ -340,17 +364,23 @@ def get_cluster_images(movie_id: int, cluster_id: int, request: Request):
 
     movie_data = dir_data[movie_id]
 
+    # Default statuses for clusters and images if the database didn't have records
+    DEFAULT_IMAGE_STATUS = "same"
+    DEFAULT_CLUSTER_STATUS = "labeled"
+
     # Find potential labels for this cluster, in the database
-    images_status = {}
-    DEFAULT_STATUS = "same"
+    images_statuses = {}
     label = None
     label_time = None
+    status = DEFAULT_CLUSTER_STATUS
+
     username = parse_user(request)
     annotation = db_client.get_annotations(username, movie_id, cluster_id)
     if annotation is not None:
-        images_status = {tag: status for tag, status in annotation["images"]}
+        images_statuses = {tag: status for tag, status in annotation["images"]}
         label = annotation["label"]
         label_time = int(annotation["created_on"])
+        status = annotation["status"]
 
     # Collect static data for each image
     cluster = movie_data["clusters"][cluster_id]
@@ -361,7 +391,7 @@ def get_cluster_images(movie_id: int, cluster_id: int, request: Request):
         images.append({
             "url": f"images/{tag}.jpeg",
             "full_frame_url": f"images/frames/{movie_id}/{frame}_{box_joined_str}.jpeg",
-            "status": images_status.get(tag, DEFAULT_STATUS),
+            "status": images_statuses.get(tag, DEFAULT_IMAGE_STATUS),
             "frame_index": frame,
         })
 
@@ -373,6 +403,7 @@ def get_cluster_images(movie_id: int, cluster_id: int, request: Request):
         "cluster_id": cluster_id,
         "label": label,
         "label_time": label_time,
+        "status": status,
         "images": images,
         "n_trajectories": cluster["n_trajectories"],
         "predicted_actors": predicted_actors,

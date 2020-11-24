@@ -1,13 +1,18 @@
 import { createSlice } from '@reduxjs/toolkit'
 import client from 'app/client'
+import { fetchMovieAsync } from 'features/sidebar/sidebarSlice'
 
-const IMAGE_STATUSES = ["same", "different", "invalid"]
+// Cluster and image statuses that match those of the database
+const IMAGE_STATUSES = ['same', 'different', 'invalid']
+export const CLUSTER_STATUSES = ['postponed', 'discarded', 'mixed']
+const DEFAULT_CLUSTER_STATUS = 'labeled'
 
 export const facesSlice = createSlice({
   name: 'faces',
   initialState: {
     loading: true,
     clusterId: null,
+    clusterStatus: DEFAULT_CLUSTER_STATUS,
     clusterDirty: null,
     clusterShowTime: null,  // number, unix time in milliseconds when cluster appeared
     labelTime: null, // integer, time in milliseconds
@@ -25,6 +30,7 @@ export const facesSlice = createSlice({
       state.loading = false
       state.clusterDirty = false
       state.clusterId = action.payload.clusterId
+      state.clusterStatus = action.payload.status
       state.images = action.payload.images
       state.predictedActors = action.payload.predictedActors
       const hasTime = !!action.payload.labelTime
@@ -41,19 +47,26 @@ export const facesSlice = createSlice({
       state.selectedActorId = action.payload.selectedActorId
     },
     toggleImage: (state, action) => {
-      if (action.payload.markDirty) {
-        state.clusterDirty = true
-      }
-      const i = action.payload.imageIndex
+      state.clusterDirty = true
+      const i = action.payload
       const currentIndex = IMAGE_STATUSES.findIndex(status => status === state.images[i].status)
-      const nextIndex = (IMAGE_STATUSES.length + currentIndex + 1) % IMAGE_STATUSES.length
+      const nextIndex = (currentIndex + 1) % IMAGE_STATUSES.length
       state.images[i].status = IMAGE_STATUSES[nextIndex]
+    },
+    setStatus: (state, action) => {
+      state.clusterDirty = true
+      const status = action.payload
+      if (status && CLUSTER_STATUSES.includes(status)) {
+        state.clusterStatus = status
+      } else {
+        state.clusterStatus = DEFAULT_CLUSTER_STATUS
+      }
     }
   }
 })
 
 const { setCluster } = facesSlice.actions
-export const { toggleImage, setActors, setSelectedActor } = facesSlice.actions
+export const { toggleImage, setActors, setSelectedActor, setStatus } = facesSlice.actions
 
 // The function below is called a thunk and allows us to perform async logic. It
 // can be dispatched like a regular action: `dispatch(incrementAsync(10))`. This
@@ -70,11 +83,14 @@ export const fetchClusterAsync = (movieId, clusterId) => dispatch => {
     })
 }
 
-export const sendClusterAsync = (movieId, clusterId, images, label, time) => {
-  const data = {label, images, time, status: "labeled"}
-  client.post(`faces/clusters/images/${movieId}/${clusterId}`, data)
-    .then(_ => console.log("Send data for cluster: " + clusterId))
-    .catch(_ => console.log("FAILED for cluster: " + clusterId))
+export const sendClusterAsync = (movieId, cluster) => dispatch => {
+  // Keys in cluster: label, images, time, status
+  client.post(`faces/clusters/images/${movieId}/${cluster.id}`, cluster)
+    .then(_ => {
+      console.log("Send data for cluster: " + cluster.id)
+      dispatch(fetchMovieAsync(movieId))
+    })
+    .catch(_ => console.log("FAILED for cluster: " + cluster.id))
 }
 
 export const fetchActorsAsync = movieId => dispatch => {

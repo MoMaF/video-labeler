@@ -7,7 +7,7 @@ export const sidebarSlice = createSlice({
   name: 'sidebar',
   initialState: {
     loading: true,
-    movies: null,  // {name, id, year, nClusters}
+    movies: null,  // {name, id, year, nClusters, nLabeledClusters}
     selectedMovie: null,
   },
   reducers: {
@@ -18,11 +18,18 @@ export const sidebarSlice = createSlice({
     },
     setSelectedMovie: (state, action) => {
       state.selectedMovie = action.payload.movie
+    },
+    updateMovie: (state, action) => {
+      if (state.movies !== null && state.movies.length > 0) {
+        const movie = action.payload
+        const i = state.movies.findIndex(({id}) => id === movie.id)
+        state.movies[i] = movie
+      }
     }
   }
 })
 
-const { setMovies, setSelectedMovie } = sidebarSlice.actions
+const { setMovies, setSelectedMovie, updateMovie } = sidebarSlice.actions
 
 // The function below is called a thunk and allows us to perform async logic. It
 // can be dispatched like a regular action: `dispatch(incrementAsync(10))`. This
@@ -37,6 +44,15 @@ export const fetchMoviesAsync = () => dispatch => {
       if (movies && movies.length > 0) {
         dispatch(selectMovieAndFetch(movies[0]))
       }
+    })
+}
+
+// Update the data of a single movie
+export const fetchMovieAsync = movieId => dispatch => {
+  client.get(`movies/${movieId}`)
+    .then(response => {
+      const movie = response.data
+      dispatch(updateMovie(movie))
     })
 }
 

@@ -43,6 +43,10 @@
   height: 100%;
 }
 
+.faceimg-border:hover {
+  background-color: #FFF2;
+}
+
 .faceview-info {
   padding-left: 16px;
   padding-bottom: 16px;
@@ -71,6 +75,35 @@
 
 .invalid-image {
   border: 3px solid #ff3333;
+}
+
+.faceview-info-header>h3 {
+  display: inline-block;
+  margin-right: 32px;
+}
+
+.status-btn {
+  display: inline-block;
+  padding: 4px 8px;
+  margin: 0 2px;
+  border-radius: 4px;
+  background-color: #eee;
+  border: 1px solid #aaa;
+}
+
+.status-btn:hover {
+  background-color: #d9d9d9;
+}
+
+.status-btn.selected {
+  background-color: #008CBA;
+  border: 1px solid #005774;
+  color: white;
+  font-weight: bold;
+}
+
+.status-btn.selected:hover {
+  background-color: #0079a1;
 }
 
 /* Loader */

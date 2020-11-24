@@ -9,6 +9,8 @@ import {
   toggleImage,
   setSelectedActor,
   selectProps,
+  setStatus,
+  CLUSTER_STATUSES,
 } from './facesSlice'
 import './FaceView.css'
 import { setHoverItem } from 'features/hover_view/hoverSlice'
@@ -34,10 +36,11 @@ class FaceView extends Component {
     this.handleActorClicked = this.handleActorClicked.bind(this)
     this.handleElementEnter = this.handleElementEnter.bind(this)
     this.handleElementLeave = this.handleElementLeave.bind(this)
+    this.handleStatusClicked = this.handleStatusClicked.bind(this)
   }
 
   handleImageClicked(imageIndex) {
-    this.props.dispatch(toggleImage({imageIndex, markDirty: true}))
+    this.props.dispatch(toggleImage(imageIndex))
   }
 
   handleActorClicked(actor) {
@@ -50,6 +53,10 @@ class FaceView extends Component {
     this.props.dispatch(setSelectedActor({
       selectedActorId: actorId, markDirty: true,
     }))
+  }
+
+  handleStatusClicked(status) {
+    this.props.dispatch(setStatus(status))
   }
 
   handleKeyPress(event) {
@@ -83,10 +90,14 @@ class FaceView extends Component {
       // Save data for current cluster
       if (this.props.clusterDirty) {
         console.log("Cluster dirty: SENDING TO DATABASE")
-        const label = this.props.selectedActorId
-        const startTime = this.props.clusterShowTime
-        const time = Math.round((new Date()).getTime() - startTime)
-        sendClusterAsync(movieId, clusterId, this.props.images, label, time)
+        const cluster = {
+          id: clusterId,
+          label: this.props.selectedActorId,
+          time: Math.round((new Date()).getTime() - this.props.clusterShowTime),
+          images: this.props.images,
+          status: this.props.clusterStatus,
+        }
+        dispatch(sendClusterAsync(movieId, cluster))
       } else {
         console.log("Cluster NOT DIRTY")
       }
@@ -118,17 +129,18 @@ class FaceView extends Component {
         subTitle: actor.role,
       }))
 
+      // Format time message about when cluster was saved in database
       let labelTimeMsg = 'No information about this cluster in the database.'
       if (labelTime !== null) {
         labelTimeMsg = 'Cluster data saved to database at '
         const d = dayjs(labelTime)
-        console.log(d, dayjs().utcOffset())
         const isToday = dayjs().isSame(d, 'day')
         let timePart = (isToday) ? "" : (d.format('MMMM D YYYY, '))
         timePart += (d.format('HH:mm:ss') + `. (${d.fromNow()})`)
         labelTimeMsg += timePart
       }
 
+      // Render all image views of actor faces
       const imagesViews = images.map((imageData, i) => {
         const item = {
           name: "Frame " + imageData.frameIndex,
@@ -151,19 +163,36 @@ class FaceView extends Component {
           </div>
         )
       })
+
+      // Render the small buttons with cluster status labels
+      const statusButtons = CLUSTER_STATUSES.map((status, index) => {
+        const text = status[0].toUpperCase() + status.slice(1)
+        const isSelected = status === this.props.clusterStatus
+        const extraClass = (isSelected) ? 'selected' : ''
+        const statusOnClick = (isSelected) ? null : CLUSTER_STATUSES[index]
+        return (<div
+          className={`status-btn ${extraClass}`}
+          onClick={this.handleStatusClicked.bind(this, statusOnClick)}
+        >{text}</div>)
+      })
+
+      // Compose the full view and return
       return (
         <div className="faceview">
           <div className="faceview-content">
             <div className="faceview-info">
-              <h3>{`Cluster ${(clusterId + 1)} / ${nClusters}`}</h3>
-            <p>{labelTimeMsg}</p>
+              <div className="faceview-info-header">
+                <h3>{`Cluster ${(clusterId + 1)} / ${nClusters}`}</h3>
+                {statusButtons}
+              </div>
+              <p>{labelTimeMsg}</p>
             </div>
             <div className="faces-container">
               {imagesViews}
             </div>
           </div>
           <div className="faceview-list">
-            <h3>Selected actor/label:</h3>
+            <h3>Actors</h3>
             <ListView
               items={actors}
               itemClicked={this.handleActorClicked}

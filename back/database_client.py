@@ -1,5 +1,6 @@
 from datetime import datetime
 from collections import defaultdict
+from typing import Optional
 
 import psycopg2
 import psycopg2.extras
@@ -102,16 +103,20 @@ class DatabaseClient:
             "cluster_id": cluster_id,
             "username": cluster_user,
             "label": label,
+            "status": cluster_status,
             "created_on": created_on,
             "images": images,  # tuples (image_tag: str, status: str)
         }
 
-    def get_annotation_counts(self):
+    def get_annotation_counts(self, movie_id: Optional[int] = None):
         """Return count of how many clusters have been labeled, per movie.
         """
-        q = """SELECT movie_id, COUNT(DISTINCT cluster_id)
+        movie_clause = ""
+        if movie_id is not None:
+            movie_clause = f"AND movie_id = {movie_id}"
+        q = f"""SELECT movie_id, COUNT(DISTINCT cluster_id)
             FROM public.clusters
-            WHERE label IS NOT NULL
+            WHERE label IS NOT NULL {movie_clause}
             GROUP BY movie_id;
         """
 
@@ -121,4 +126,4 @@ class DatabaseClient:
         result = cursor.fetchall()
 
         movie_counts = {movie_id: count for movie_id, count in result}
-        return defaultdict(int, movie_counts)
+        return defaultdict(lambda: 0, movie_counts)
