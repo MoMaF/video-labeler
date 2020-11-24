@@ -185,6 +185,11 @@ def read_datadirs(data_dir):
             # Uniquely map (frame, *box) -> trajectory id for every shown image
             trajectory_map |= {tuple([frame, *box]): ti for frame, box in image_bbs}
 
+        # Compute new order of cluster that is served to the front, largest first.
+        # TODO: move to extraction pipeline?
+        cluster_order_fun = lambda ci: (-clusters[ci]["n_shown_images"], ci)
+        cluster_order = sorted(range(len(clusters)), key=cluster_order_fun)
+
         # Read per-cluster predictions
         with open(predictions_file, "r") as f:
             predictions = json.load(f)
@@ -204,6 +209,7 @@ def read_datadirs(data_dir):
             "path": dir,
             "movie_path": movie_path,
             "clusters": clusters,
+            "cluster_order": cluster_order,
             "n_clusters": len(clusters),
             "predictions": predictions,
             "trajectory_map": trajectory_map,
@@ -363,6 +369,7 @@ def get_cluster_images(movie_id: int, cluster_id: int, request: Request):
         return HTTPException(404, f"Invalid movie id {movie_id}.")
 
     movie_data = dir_data[movie_id]
+    data_cluster_id = movie_data["cluster_order"][cluster_id]
 
     # Default statuses for clusters and images if the database didn't have records
     DEFAULT_IMAGE_STATUS = "same"
@@ -375,7 +382,7 @@ def get_cluster_images(movie_id: int, cluster_id: int, request: Request):
     status = DEFAULT_CLUSTER_STATUS
 
     username = parse_user(request)
-    annotation = db_client.get_annotations(username, movie_id, cluster_id)
+    annotation = db_client.get_annotations(username, movie_id, data_cluster_id)
     if annotation is not None:
         images_statuses = {tag: status for tag, status in annotation["images"]}
         label = annotation["label"]
@@ -383,7 +390,7 @@ def get_cluster_images(movie_id: int, cluster_id: int, request: Request):
         status = annotation["status"]
 
     # Collect static data for each image
-    cluster = movie_data["clusters"][cluster_id]
+    cluster = movie_data["clusters"][data_cluster_id]
     images = []
     for _, frame, box in cluster["image_data"]:
         tag = img_tag(movie_id, frame, box)
@@ -396,7 +403,7 @@ def get_cluster_images(movie_id: int, cluster_id: int, request: Request):
         })
 
     # Expose prediction data for the API
-    preds = movie_data["predictions"][cluster_id]
+    preds = movie_data["predictions"][data_cluster_id]
     predicted_actors = [actor_id for actor_id, p in preds.items() if p > PREDICTION_MIN_P]
 
     return {
@@ -415,6 +422,7 @@ def set_cluster_labels(movie_id: int, cluster_id: int, data: ClusterLabels, requ
         return HTTPException(404, f"Invalid movie id {movie_id}.")
 
     movie_data = dir_data[movie_id]
+    data_cluster_id = movie_data["cluster_order"][cluster_id]
 
     image_data_db = []
     for image in data.images:
@@ -426,7 +434,7 @@ def set_cluster_labels(movie_id: int, cluster_id: int, data: ClusterLabels, requ
 
     username = parse_user(request)
     db_client.insert_annotations(
-        username, movie_id, cluster_id, data.label, image_data_db, data.status, data.time
+        username, movie_id, data_cluster_id, data.label, image_data_db, data.status, data.time
     )
     return {"status": "ok"}
 
