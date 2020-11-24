@@ -36,9 +36,6 @@ COPY ./back /app
 RUN pip install -r /app/requirements.txt
 ENV PYTHONPATH="/app"
 
-# TODO: replace HTTP basic auth with something better
-COPY .htpasswd /etc/nginx/
-
 # ENV POSTGRES_PASSWORD=test - define password when starting
 ENV DB_HOST=host.docker.internal
 # Mount /app-data folders so that the container can access data
