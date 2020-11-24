@@ -35,6 +35,21 @@ const { setMovies, setSelectedMovie, updateMovie } = sidebarSlice.actions
 // can be dispatched like a regular action: `dispatch(incrementAsync(10))`. This
 // will call the thunk with the `dispatch` function as the first argument. Async
 // code can then be executed and other actions can be dispatched
+
+const parseUrl = () => {
+  // Parse page url like: /movies/121614/clusters/2
+  const path = window.location.pathname.replace(/\/$/, "")
+  const pathPattern = new RegExp("^/movies/[0-9]+/clusters/[0-9]+$")
+  if (!pathPattern.test(path)) {
+    return [0, 0]
+  }
+
+  const parts = path.split("/")
+  const movieId = parseInt(parts[2])
+  const clusterId = parseInt(parts[4]) - 1
+  return [movieId, clusterId]
+}
+
 export const fetchMoviesAsync = () => dispatch => {
   client.get('movies')
     .then(response => {
@@ -42,7 +57,11 @@ export const fetchMoviesAsync = () => dispatch => {
       dispatch(setMovies({movies}))
 
       if (movies && movies.length > 0) {
-        dispatch(selectMovieAndFetch(movies[0]))
+        const [firstMovieId, firstClusterId] = parseUrl()
+        let movie = movies.find(movie => movie.id === firstMovieId) || movies[0]
+        const n = movie.nClusters
+        const clusterId = (n + firstClusterId) % n
+        dispatch(selectMovieAndFetch(movie, clusterId))
       }
     })
 }
@@ -57,9 +76,9 @@ export const fetchMovieAsync = movieId => dispatch => {
 }
 
 // movie = {name, id}
-export const selectMovieAndFetch = movie => dispatch => {
+export const selectMovieAndFetch = (movie, firstClusterId) => dispatch => {
   dispatch(setSelectedMovie({movie}))
-  dispatch(fetchClusterAsync(movie.id, 0))
+  dispatch(fetchClusterAsync(movie.id, firstClusterId))
   dispatch(fetchActorsAsync(movie.id))
 }
 

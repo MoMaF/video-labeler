@@ -36,7 +36,7 @@ class Sidebar extends Component {
                 items={movies}
                 selectedItem={this.props.selectedMovie ? this.props.selectedMovie.id : null}
                 itemClicked={(movie, event) => {
-                    dispatch(selectMovieAndFetch(movie))
+                    dispatch(selectMovieAndFetch(movie, 0))
 
                 }}
             />

@@ -79,6 +79,10 @@ export const fetchClusterAsync = (movieId, clusterId) => dispatch => {
       dispatch(setCluster(cluster))
       const selectedActor = {selectedActorId: cluster.label, markDirty: false}
       dispatch(setSelectedActor(selectedActor))
+
+      // At the same time, update the window url
+      const newUrl = `/movies/${movieId}/clusters/${clusterId + 1}`
+      window.history.replaceState(null, document.title, window.location.origin + newUrl)
     })
 }
 
