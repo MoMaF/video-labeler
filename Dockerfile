@@ -31,13 +31,13 @@ COPY nginx/nginx_mysite.conf /etc/nginx/sites-available/
 COPY nginx/ssl-params.conf /etc/nginx/
 RUN ln -s /etc/nginx/sites-available/nginx_mysite.conf /etc/nginx/sites-enabled/mysite
 
-# TODO: replace HTTP basic auth with something better
-COPY .htpasswd /etc/nginx/
-
 # -------------- 2. setup backend -----------------
 COPY ./back /app
 RUN pip install -r /app/requirements.txt
 ENV PYTHONPATH="/app"
+
+# TODO: replace HTTP basic auth with something better
+COPY .htpasswd /etc/nginx/
 
 # ENV POSTGRES_PASSWORD=test - define password when starting
 ENV DB_HOST=host.docker.internal
@@ -47,5 +47,6 @@ ENV FILMS_DIR="/app-data/films"
 ENV METADATA_DIR="/app-data/metadata"
 
 RUN echo 'nginx; uvicorn app.main:app --host 127.0.0.1 --port 8080' >> /start.sh
+RUN chmod +x /start.sh
 
-CMD ["bash", "/start.sh"]
+ENTRYPOINT /start.sh
