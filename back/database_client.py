@@ -39,7 +39,10 @@ class DatabaseClient:
         cursor = self.conn.cursor()
 
         # Check if cluster exists already
-        q1 = "SELECT id, processing_time FROM clusters WHERE username = %s AND movie_id = %s AND cluster_id = %s;"
+        q1 = """SELECT id, processing_time
+            FROM clusters
+            WHERE username = %s AND movie_id = %s AND cluster_id = %s;
+            """
         cursor.execute(q1, (username, movie_id, cluster_id))
         result = cursor.fetchone()
 
@@ -98,6 +101,10 @@ class DatabaseClient:
         cursor.execute(q2, (db_cluster_id,))
         images = cursor.fetchall()
 
+        # Psycopg opens transactions even with SELECT queries, so we close it here:
+        self.conn.commit()
+        cursor.close()
+
         return {
             "movie_id": movie_id,
             "cluster_id": cluster_id,
@@ -114,16 +121,19 @@ class DatabaseClient:
         movie_clause = ""
         if movie_id is not None:
             movie_clause = f"AND movie_id = {movie_id}"
+
         q = f"""SELECT movie_id, COUNT(DISTINCT cluster_id)
             FROM public.clusters
             WHERE label IS NOT NULL {movie_clause}
             GROUP BY movie_id;
         """
 
-        cursor = self.conn.cursor()
-        cursor.execute(q)
+        with self.conn.cursor() as cursor:
+            cursor.execute(q)
+            result = cursor.fetchall()
 
-        result = cursor.fetchall()
+            # Psycopg opens transactions even with SELECT queries, so we close it here:
+            self.conn.commit()
 
         movie_counts = {movie_id: count for movie_id, count in result}
         return defaultdict(lambda: 0, movie_counts)
