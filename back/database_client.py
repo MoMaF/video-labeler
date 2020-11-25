@@ -1,9 +1,11 @@
 from datetime import datetime
 from collections import defaultdict
 from typing import Optional
+import traceback
 
 import psycopg2
 import psycopg2.extras
+import psycopg2.errors
 import pandas as pd
 
 class DatabaseClient:
@@ -17,9 +19,9 @@ class DatabaseClient:
             port=port,
             database=database,
         )
+        self.conn.autocommit = False
 
     def close(self):
-        print("Closing")
         if self.conn:
             self.conn.close()
 
@@ -36,45 +38,53 @@ class DatabaseClient:
             status (str): cluster status: 'labeled', 'discarded', 'postponed', 'mixed'
             time (int): processing time the user took to label this cluster, milliseconds
         """
+        insert_success = True
         cursor = self.conn.cursor()
 
-        # Check if cluster exists already
-        q1 = """SELECT id, processing_time
-            FROM clusters
-            WHERE username = %s AND movie_id = %s AND cluster_id = %s;
+        try:
+            # Check if cluster exists already
+            q1 = """SELECT id, processing_time
+                FROM clusters
+                WHERE username = %s AND movie_id = %s AND cluster_id = %s;
+                """
+            cursor.execute(q1, (username, movie_id, cluster_id))
+            result = cursor.fetchone()
+
+            # Delete the old records if they existed
+            existed = result is not None
+            if existed:
+                db_cluster_id, time_so_far = result
+                cursor.execute("DELETE FROM images WHERE cluster_id = %s;", (db_cluster_id,))
+                cursor.execute("DELETE FROM clusters WHERE id = %s;", (db_cluster_id,))
+
+                # Add up so that processing time is the total time for this user
+                time += time_so_far
+
+            # Create cluster (or recreate...)
+            q2 = """INSERT INTO
+                clusters (username, movie_id, cluster_id, status, label, n_images, processing_time)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                RETURNING id;
             """
-        cursor.execute(q1, (username, movie_id, cluster_id))
-        result = cursor.fetchone()
+            cursor.execute(q2, (username, movie_id, cluster_id, status, label, len(images), time))
+            db_cluster_id = cursor.fetchone()[0]
 
-        # Delete the old records if they existed
-        existed = result is not None
-        if existed:
-            db_cluster_id, time_so_far = result
-            cursor.execute("DELETE FROM images WHERE cluster_id = %s;", (db_cluster_id,))
-            cursor.execute("DELETE FROM clusters WHERE id = %s;", (db_cluster_id,))
+            # Add images that were in the cluster.
+            # Image list - tuples (tag: str, status: str, trajectory: int)
+            q3 = "INSERT INTO images (cluster_id, tag, status, trajectory) VALUES %s;"
+            psycopg2.extras.execute_values(
+                cursor, q3, [(db_cluster_id, tag, status, t_id) for tag, status, t_id in images],
+                template=None, page_size=100,
+            )
 
-            # Add up so that processing time is the total time for this user
-            time += time_so_far
-
-        # Create cluster (or recreate...)
-        q2 = """INSERT INTO
-            clusters (username, movie_id, cluster_id, status, label, n_images, processing_time)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-            RETURNING id;
-        """
-        cursor.execute(q2, (username, movie_id, cluster_id, status, label, len(images), time))
-        db_cluster_id = cursor.fetchone()[0]
-
-        # Add images that were in the cluster.
-        # Image list - tuples (tag: str, status: str, trajectory: int)
-        q3 = "INSERT INTO images (cluster_id, tag, status, trajectory) VALUES %s;"
-        psycopg2.extras.execute_values(
-            cursor, q3, [(db_cluster_id, tag, status, t_id) for tag, status, t_id in images],
-            template=None, page_size=100,
-        )
-
-        self.conn.commit()
-        cursor.close()
+            self.conn.commit()
+        except psycopg2.Error as e:
+            insert_success = False
+            self.conn.rollback()
+            traceback.print_exc()
+        finally:
+            cursor.close()
+            return insert_success
 
     def get_annotations(self, username, movie_id, cluster_id):
         cursor = self.conn.cursor()
@@ -82,11 +92,16 @@ class DatabaseClient:
             FROM clusters
             WHERE movie_id = %s AND cluster_id = %s;
         """
-        cursor.execute(q1, (movie_id, cluster_id))
-        results = cursor.fetchall()
 
-        if not results:
+        try:
+            cursor.execute(q1, (movie_id, cluster_id))
+        except psycopg2.errors.InFailedSqlTransaction as err:
+            traceback.print_exc()
             return None
+
+        results = cursor.fetchall()
+        if not results:
+            return {}
 
         # Find result by current user, if it existed
         first_result = results[0]
@@ -98,9 +113,13 @@ class DatabaseClient:
         db_cluster_id, cluster_user, label, cluster_status, n_images, created_on = first_result
 
         q2 = "SELECT tag, status FROM images WHERE cluster_id = %s;"
-        cursor.execute(q2, (db_cluster_id,))
-        images = cursor.fetchall()
+        try:
+            cursor.execute(q2, (db_cluster_id,))
+        except psycopg2.errors.InFailedSqlTransaction as err:
+            traceback.print_exc()
+            return None
 
+        images = cursor.fetchall()
         # Psycopg opens transactions even with SELECT queries, so we close it here:
         self.conn.commit()
         cursor.close()
@@ -111,7 +130,7 @@ class DatabaseClient:
             "username": cluster_user,
             "label": label,
             "status": cluster_status,
-            "created_on": created_on,
+            "created_on": int(created_on),
             "images": images,  # tuples (image_tag: str, status: str)
         }
 
@@ -123,17 +142,21 @@ class DatabaseClient:
             movie_clause = f"AND movie_id = {movie_id}"
 
         q = f"""SELECT movie_id, COUNT(DISTINCT cluster_id)
-            FROM public.clusters
+            FROM clusters
             WHERE label IS NOT NULL {movie_clause}
             GROUP BY movie_id;
         """
 
+        movie_counts = None
         with self.conn.cursor() as cursor:
-            cursor.execute(q)
-            result = cursor.fetchall()
+            try:
+                cursor.execute(q)
+                result = cursor.fetchall()
+                # Psycopg opens transactions even with SELECT queries, so we close it here:
+                self.conn.commit()
+                counts = {movie_id: count for movie_id, count in result}
+                movie_counts = defaultdict(lambda: 0, counts)
+            except psycopg2.errors.InFailedSqlTransaction as err:
+                traceback.print_exc()
 
-            # Psycopg opens transactions even with SELECT queries, so we close it here:
-            self.conn.commit()
-
-        movie_counts = {movie_id: count for movie_id, count in result}
-        return defaultdict(lambda: 0, movie_counts)
+        return movie_counts

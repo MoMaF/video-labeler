@@ -130,9 +130,9 @@ class FaceView extends Component {
       }))
 
       // Format time message about when cluster was saved in database
-      let labelTimeMsg = 'No information about this cluster in the database.'
+      let labelTimeMsg = 'Nobody tried to label this cluster before. Be the first!'
       if (labelTime !== null) {
-        labelTimeMsg = 'Cluster data saved to database at '
+        labelTimeMsg = 'Cluster data saved at '
         const d = dayjs(labelTime)
         const isToday = dayjs().isSame(d, 'day')
         let timePart = (isToday) ? "" : (d.format('MMMM D YYYY, '))

@@ -6,7 +6,7 @@ import signal
 import io
 import base64
 
-from fastapi import Body, FastAPI, HTTPException, Request
+from fastapi import Body, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import Response, FileResponse, StreamingResponse
@@ -246,6 +246,13 @@ def get_movie(movie_id: int):
     """Get metadata about a single movie.
     """
     movie_counts = db_client.get_annotation_counts(movie_id)
+    if movie_counts is None:
+        response.status_code = 500
+        return {
+            "error": "Could not read movie label counts from database.",
+            "code": "LABEL_COUNT_READ",
+        }
+
     movie_data = get_movie_data([movie_id], movie_counts)
 
     if movie_data is None:
@@ -254,10 +261,17 @@ def get_movie(movie_id: int):
     return movie_data[0]
 
 @app.get("/api/movies")
-def list_movies():
+def list_movies(response: Response):
     """Get metadata about all movies available in the backend.
     """
     movie_counts = db_client.get_annotation_counts()
+    if movie_counts is None:
+        response.status_code = 500
+        return {
+            "error": "Could not read movie label counts from database.",
+            "code": "LABEL_COUNT_READ",
+        }
+
     all_movie_ids = movie_df.id.tolist()
     movie_data = get_movie_data(all_movie_ids, movie_counts)
 
@@ -364,7 +378,7 @@ def get_image(movie_id: int, label: str):
     )
 
 @app.get("/api/faces/clusters/{movie_id}/{cluster_id}")
-def get_cluster_data(movie_id: int, cluster_id: int, request: Request):
+def get_cluster_data(movie_id: int, cluster_id: int, request: Request, response: Response):
     """Main endpoint to get all data of a cluster.
     """
     if movie_id not in movie_df.index:
@@ -377,19 +391,21 @@ def get_cluster_data(movie_id: int, cluster_id: int, request: Request):
     DEFAULT_IMAGE_STATUS = "same"
     DEFAULT_CLUSTER_STATUS = "labeled"
 
-    # Find potential labels for this cluster, in the database
-    images_statuses = {}
-    label = None
-    label_time = None
-    status = DEFAULT_CLUSTER_STATUS
-
     username = parse_user(request)
     annotation = db_client.get_annotations(username, movie_id, data_cluster_id)
-    if annotation is not None:
-        images_statuses = {tag: status for tag, status in annotation["images"]}
-        label = annotation["label"]
-        label_time = int(annotation["created_on"])
-        status = annotation["status"]
+
+    if annotation is None:
+        # Rare database error occurred, show in response code
+        response.status_code = 500
+        return {
+            "error": "Couldn't read cluster info from database.",
+            "code": "DATABASE_READ_ERROR",
+        }
+
+    images_statuses = {tag: status for tag, status in annotation.get("images", [])}
+    label = annotation.get("label", None)
+    label_time = annotation.get("created_on", None)
+    status = annotation.get("status", DEFAULT_CLUSTER_STATUS)
 
     # Collect static data for each image
     cluster = movie_data["clusters"][data_cluster_id]
@@ -419,7 +435,9 @@ def get_cluster_data(movie_id: int, cluster_id: int, request: Request):
     }
 
 @app.post("/api/faces/clusters/{movie_id}/{cluster_id}")
-def set_cluster_data(movie_id: int, cluster_id: int, data: ClusterLabels, request: Request):
+def set_cluster_data(
+    movie_id: int, cluster_id: int, data: ClusterLabels, request: Request, response: Response
+):
     """Main endpoint to save cluster data to persistent storage. Eg. assign label.
     """
     if movie_id not in dir_data:
@@ -437,10 +455,19 @@ def set_cluster_data(movie_id: int, cluster_id: int, data: ClusterLabels, reques
         image_data_db.append((tag, image.status, trajectory_id))
 
     username = parse_user(request)
-    db_client.insert_annotations(
+    success = db_client.insert_annotations(
         username, movie_id, data_cluster_id, data.label, image_data_db, data.status, data.time
     )
-    return {"status": "ok"}
+
+    if success:
+        return {"status": "ok"}
+    else:
+        # Rare database error occurred, produce error response.
+        response.status_code = 500
+        return {
+            "error": "Couldn't save cluster info to database.",
+            "code": "DATABASE_WRITE_ERROR",
+        }
 
 if __name__ == "__main__":
     import uvicorn
