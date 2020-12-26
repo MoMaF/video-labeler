@@ -94,6 +94,7 @@ export const sendClusterAsync = (movieId, cluster) => dispatch => {
     .then(_ => {
       console.log("Send data for cluster: " + cluster.id)
       dispatch(fetchMovieAsync(movieId))
+      dispatch(fetchActorsAsync(movieId))
     })
     .catch(_ => console.log("FAILED for cluster: " + cluster.id))
 }
