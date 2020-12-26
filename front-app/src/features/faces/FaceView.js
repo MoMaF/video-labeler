@@ -126,7 +126,7 @@ class FaceView extends Component {
       const actors = rawActors.map(actor => ({
         ...actor,
         afterName: (actor.predicted ? " 🔮 (Predicted)" : ""),
-        subTitle: actor.role,
+        subTitle: actor.role + ` - ${actor.movieCount} (${actor.globalCount})`,
       }))
 
       // Format time message about when cluster was saved in database

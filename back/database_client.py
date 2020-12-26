@@ -160,3 +160,47 @@ class DatabaseClient:
                 traceback.print_exc()
 
         return movie_counts
+
+    def get_actor_counts(self, movie_id: int):
+        """Get labeled images count on movie level and global level, for each
+        every actor in the database.
+        """
+        def get_counts(movie_id: Optional[int] = None):
+            """Utility function.
+            """
+            movie_clause = ""
+            if movie_id is not None:
+                movie_clause = f"AND movie_id = {movie_id}"
+
+            # Query to get actor level image counts
+            # Counts images labeled in the tool (usually 2x trajectories in a cluster)
+            q = f"""SELECT label, COUNT(trajectory)
+                FROM (
+                    SELECT id, movie_id, label FROM clusters
+                    WHERE status = 'labeled' AND label IS NOT NULL {movie_clause}
+                ) AS clusters
+                INNER JOIN (
+                    SELECT * FROM images
+                    WHERE status = 'same'
+                ) AS images
+                ON (clusters.id = images.cluster_id)
+                GROUP BY label;"""
+
+            actor_counts = None
+            with self.conn.cursor() as cursor:
+                try:
+                    cursor.execute(q)
+                    result = cursor.fetchall()
+                    # Psycopg opens transactions even with SELECT queries, so we close it here:
+                    self.conn.commit()
+                    counts = {actor_id: count for actor_id, count in result}
+                    actor_counts = defaultdict(lambda: 0, counts)
+                except psycopg2.errors.InFailedSqlTransaction as err:
+                    traceback.print_exc()
+
+            return actor_counts
+
+        count_global = get_counts()
+        count_movie = get_counts(movie_id)
+
+        return count_global, count_movie

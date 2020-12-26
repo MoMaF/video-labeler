@@ -279,6 +279,9 @@ def list_movies(response: Response):
 
 @app.get("/api/actors/{movie_id}")
 def list_actors(movie_id: int):
+    # Get the number of current images labeled, global and movie level
+    global_count, movie_count = db_client.get_actor_counts(movie_id)
+
     df = actors_df.loc[movie_id]
     actors = []
     for actor in df.itertuples():
@@ -294,6 +297,8 @@ def list_actors(movie_id: int):
             "name": actor.name,
             "role": actor.role,
             "images": [f"images/actors/{name}" for name in image_names],
+            "movie_count": movie_count[actor.id],
+            "global_count": global_count[actor.id],
         })
     return actors
 
