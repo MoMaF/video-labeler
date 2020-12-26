@@ -204,6 +204,11 @@ def read_datadirs(data_dir):
         assert movie_id in movie_path_map, f"Movie file not found for: {movie_id}"
         movie_path = movie_path_map[movie_id]
 
+        # Read movie fps from file so that frontend can compute hh:mm:ss for frames!
+        cap = cv2.VideoCapture(movie_path)
+        fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
+        cap.release()
+
         data = {
             "id": movie_id,
             "path": dir,
@@ -213,6 +218,7 @@ def read_datadirs(data_dir):
             "n_clusters": len(clusters),
             "predictions": predictions,
             "trajectory_map": trajectory_map,
+            "fps": fps,
         }
         dir_data[movie_id] = data
 
@@ -226,6 +232,7 @@ dir_data = read_datadirs(DATA_DIR)
 movie_df = movie_df.loc[dir_data.keys()]
 movie_df["year"] = movie_df.year.astype(int)
 movie_df["n_clusters"] = movie_df.index.map(lambda movie_id: dir_data[movie_id]["n_clusters"])
+movie_df["fps"] = movie_df.index.map(lambda movie_id: dir_data[movie_id]["fps"])
 
 def get_movie_data(movie_ids: List[int], movie_counts):
     """Utility method to get movie data in a JSON-digestible format.
@@ -239,6 +246,7 @@ def get_movie_data(movie_ids: List[int], movie_counts):
         "year": int(movie_df.at[id, "year"]),
         "n_clusters": int(movie_df.at[id, "n_clusters"]),
         "n_labeled_clusters": movie_counts[id],
+        "fps": movie_df.at[id, "fps"],
     } for id in movie_ids]
 
 @app.get("/api/movies/{movie_id}")
@@ -322,6 +330,7 @@ def get_frame(movie_id: int, frame_index: int, box: str):
         return HTTPException(400, "Bad request!")
 
     ret, frame = cap.read()
+    cap.release()
 
     if not ret:
         return HTTPException(500, "Error reading movie.")

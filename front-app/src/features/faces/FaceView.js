@@ -23,6 +23,10 @@ dayjs.extend(utc)
 // Key required to be pressed for this view to send popup overlays
 const POPUP_KEY = 'Control'
 
+const zpad = num => {
+  return `${num}`.padStart(2, 0)
+}
+
 const Spinner = () => (
   <div className='loader'></div>
 )
@@ -122,7 +126,7 @@ class FaceView extends Component {
     if (this.props.loading) {
       return <Spinner />
     } else {
-      const {clusterId, nClusters, images, actors: rawActors, labelTime} = this.props
+      const {clusterId, nClusters, fps, images, actors: rawActors, labelTime} = this.props
       const actors = rawActors.map(actor => ({
         ...actor,
         afterName: (actor.predicted ? " 🔮 (Predicted)" : ""),
@@ -142,8 +146,13 @@ class FaceView extends Component {
 
       // Render all image views of actor faces
       const imagesViews = images.map((imageData, i) => {
+        const n = imageData.frameIndex + 1
+        const hour = Math.floor(n / (fps * 3600))
+        const min = Math.floor(n / (fps * 60) - (hour * 60))
+        const sec = Math.floor(n / fps - (hour * 3600) - (min * 60))
+        const timeStr = `${zpad(hour)}:${zpad(min)}:${zpad(sec)}`
         const item = {
-          name: "Frame " + imageData.frameIndex,
+          name: "Frame " + imageData.frameIndex + ` (${timeStr})`,
           images: [imageData.fullFrameUrl],
         }
         return (

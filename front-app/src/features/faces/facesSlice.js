@@ -111,6 +111,7 @@ export const selectProps = state => {
   const hasMovieSelected = state.sidebar.selectedMovie !== null
   const movieId = hasMovieSelected ? state.sidebar.selectedMovie.id : null
   const nClusters = hasMovieSelected ? state.sidebar.selectedMovie.nClusters : null
+  const fps = hasMovieSelected ? state.sidebar.selectedMovie.fps : null
 
   const {predictedActors: predictedIds, ...faces} = state.faces
   const hasPredictions = faces.clusterId !== null && predictedIds.length > 0
@@ -129,7 +130,7 @@ export const selectProps = state => {
   }
   const actors = [...predictedList, ...othersList]
 
-  return {...faces, movieId, nClusters, actors}
+  return {...faces, movieId, fps, nClusters, actors}
 }
 
 export default facesSlice.reducer
