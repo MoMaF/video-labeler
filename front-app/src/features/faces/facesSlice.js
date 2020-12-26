@@ -16,6 +16,7 @@ export const facesSlice = createSlice({
     clusterDirty: null,
     clusterShowTime: null,  // number, unix time in milliseconds when cluster appeared
     labelTime: null, // integer, time in milliseconds
+    clusterUser: null,  // who labeled the cluster, if anyone
     images: [], // {url, status}
     actors: [], // {id, name}
     selectedActorId: null, // label
@@ -36,6 +37,7 @@ export const facesSlice = createSlice({
       const hasTime = !!action.payload.labelTime
       state.labelTime = hasTime ? action.payload.labelTime * 1000 : null
       state.clusterShowTime = (new Date()).getTime()
+      state.clusterUser = action.payload.username
     },
     setActors: (state, action) => {
       state.actors = action.payload.actors

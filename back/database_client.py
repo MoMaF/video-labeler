@@ -41,6 +41,13 @@ class DatabaseClient:
         insert_success = True
         cursor = self.conn.cursor()
 
+        # Determine if the cluster is in initial state (=everything empty/unchanged)
+        # If yes, nothing will be inserted, but only removed to save db space/performance
+        is_default = True
+        is_default = is_default and label is None
+        is_default = is_default and status == "labeled"
+        is_default = is_default and all(img[1] == "same" for img in images)
+
         try:
             # Check if cluster exists already
             q1 = """SELECT id, processing_time
@@ -60,22 +67,23 @@ class DatabaseClient:
                 # Add up so that processing time is the total time for this user
                 time += time_so_far
 
-            # Create cluster (or recreate...)
-            q2 = """INSERT INTO
-                clusters (username, movie_id, cluster_id, status, label, n_images, processing_time)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-                RETURNING id;
-            """
-            cursor.execute(q2, (username, movie_id, cluster_id, status, label, len(images), time))
-            db_cluster_id = cursor.fetchone()[0]
+            if not is_default:
+                # Create cluster (or recreate...)
+                q2 = """INSERT INTO
+                    clusters (username, movie_id, cluster_id, status, label, n_images, processing_time)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id;
+                """
+                cursor.execute(q2, (username, movie_id, cluster_id, status, label, len(images), time))
+                db_cluster_id = cursor.fetchone()[0]
 
-            # Add images that were in the cluster.
-            # Image list - tuples (tag: str, status: str, trajectory: int)
-            q3 = "INSERT INTO images (cluster_id, tag, status, trajectory) VALUES %s;"
-            psycopg2.extras.execute_values(
-                cursor, q3, [(db_cluster_id, tag, status, t_id) for tag, status, t_id in images],
-                template=None, page_size=100,
-            )
+                # Add images that were in the cluster.
+                # Image list - tuples (tag: str, status: str, trajectory: int)
+                q3 = "INSERT INTO images (cluster_id, tag, status, trajectory) VALUES %s;"
+                psycopg2.extras.execute_values(
+                    cursor, q3, [(db_cluster_id, tag, status, t_id) for tag, status, t_id in images],
+                    template=None, page_size=100,
+                )
 
             self.conn.commit()
         except psycopg2.Error as e:

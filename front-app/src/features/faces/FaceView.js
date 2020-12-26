@@ -126,23 +126,39 @@ class FaceView extends Component {
     if (this.props.loading) {
       return <Spinner />
     } else {
-      const {clusterId, nClusters, fps, images, actors: rawActors, labelTime} = this.props
-      const actors = rawActors.map(actor => ({
-        ...actor,
-        afterName: (actor.predicted ? " 🔮 (Predicted)" : ""),
-        subTitle: actor.role + ` - ${actor.movieCount} (${actor.globalCount})`,
-      }))
+      const {
+        clusterId, nClusters, fps, clusterUser, images, actors: rawActors, labelTime, selectedActorId
+      } = this.props
+
+      let currentActorName = null
+      const actors = []
+      for (let i = 0; i < rawActors.length; ++i) {
+        const actor = rawActors[i]
+        actors.push({
+          ...actor,
+          afterName: (actor.predicted ? " 🔮 (Predicted)" : ""),
+          subTitle: actor.role + ` - ${actor.movieCount} (${actor.globalCount})`,
+        })
+        if (actor.id === selectedActorId) {
+          currentActorName = actor.name
+        }
+      }
 
       // Format time message about when cluster was saved in database
       let labelTimeMsg = 'Nobody tried to label this cluster before. Be the first!'
       if (labelTime !== null) {
-        labelTimeMsg = 'Cluster data saved at '
+        labelTimeMsg = `Cluster data saved by ${clusterUser} at `
         const d = dayjs(labelTime)
         const isToday = dayjs().isSame(d, 'day')
         let timePart = (isToday) ? "" : (d.format('MMMM D YYYY, '))
         timePart += (d.format('HH:mm:ss') + `. (${d.fromNow()})`)
         labelTimeMsg += timePart
       }
+
+      // Show name of selected actor
+      const hasActor = currentActorName !== null
+      const actorBoxClass = hasActor ? 'high-blue' : 'high-black'
+      const currentName = hasActor ? currentActorName : 'None selected'
 
       // Render all image views of actor faces
       const imagesViews = images.map((imageData, i) => {
@@ -195,6 +211,10 @@ class FaceView extends Component {
                 {statusButtons}
               </div>
               <p>{labelTimeMsg}</p>
+              <p>
+                Selected actor for this cluster:<span> </span>
+                <span className={actorBoxClass}>{currentName}</span>
+              </p>
             </div>
             <div className="faces-container">
               {imagesViews}

@@ -417,6 +417,7 @@ def get_cluster_data(movie_id: int, cluster_id: int, request: Request, response:
         }
 
     images_statuses = {tag: status for tag, status in annotation.get("images", [])}
+    username = annotation.get("username", None)
     label = annotation.get("label", None)
     label_time = annotation.get("created_on", None)
     status = annotation.get("status", DEFAULT_CLUSTER_STATUS)
@@ -439,6 +440,7 @@ def get_cluster_data(movie_id: int, cluster_id: int, request: Request, response:
     predicted_actors = [actor_id for actor_id, p in preds.items() if p > PREDICTION_MIN_P]
 
     return {
+        "username": username,
         "cluster_id": cluster_id,
         "label": label,
         "label_time": label_time,
