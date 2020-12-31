@@ -81,17 +81,19 @@ def read_metadata(metadata_dir):
 def img_tag(movie_id: int, frame: int, box: List[int]):
     """Get a 'standard' image tag as used by the face recognition stack.
     """
-    # Real example: kept-121614:003616_235_183_293_262.jpeg
-    return f"{movie_id}:{str(frame).zfill(6)}" + "_{}_{}_{}_{}".format(*box)
+    # Real example of full file name: 121614:3616:235_183_293_262.jpeg
+    # Face file names are <tag>.jpeg
+    return f"{movie_id}:{frame}" + ":{}_{}_{}_{}".format(*box)
 
 def parse_tag(tag: str):
     """Parse 'standard' image tag and return Tuple[int, int, int, int, int]
     with frame and box coordinates x1, y1, x2, y2 in one 5-tuple
     """
-    # Real example of a tag: 121614:003616_235_183_293_262
-    movie_id, rest = tag.split(":", 1)
-    tuple_data = tuple(int(c) for c in rest.split("_"))
-    return tuple_data
+    # Real example of a tag: 121614:3616:235_183_293_262
+    _, frame_str, box_str = tag.split(":", 2)
+    frame = int(frame_str)
+    box = tuple(int(c) for c in box_str.split("_"))
+    return (frame, *box)
 
 def parse_user(request: Request):
     """Parse the username out of a HTTPBasicAuth fastapi request.
@@ -150,10 +152,11 @@ def read_datadirs(data_dir):
             for t in trajectories:
                 valid_boxes = []
                 for frame, box in enumerate(t["bbs"], start=t["start"]):
-                    file_name = f"kept-{img_tag(movie_id, frame, box)}.jpeg"
+                    file_name = f"{img_tag(movie_id, frame, box)}.jpeg"
                     if file_name in images_set:
                         valid_boxes.append((frame, box))
                 t["image_bbs"] = valid_boxes
+                assert len(valid_actor_ids) > 0, "Valid boxes length?"
 
         # Read clusters corresponing to each trajectory
         with open(clusters_file, "r") as f:
@@ -185,14 +188,9 @@ def read_datadirs(data_dir):
             # Uniquely map (frame, *box) -> trajectory id for every shown image
             trajectory_map |= {tuple([frame, *box]): ti for frame, box in image_bbs}
 
-        # Compute new order of cluster that is served to the front, largest first.
-        # TODO: move to extraction pipeline?
-        cluster_order_fun = lambda ci: (-clusters[ci]["n_shown_images"], ci)
-        cluster_order = sorted(range(len(clusters)), key=cluster_order_fun)
-
         # Read per-cluster predictions
         with open(predictions_file, "r") as f:
-            predictions = json.load(f)
+            predictions = json.load(f)["predictions"]
             # Convert keys to integers (JSON only has string keys)
             predictions = {
                 int(cluster_id): {int(actor_id): p for actor_id, p in cluster_preds.items()}
@@ -214,7 +212,6 @@ def read_datadirs(data_dir):
             "path": dir,
             "movie_path": movie_path,
             "clusters": clusters,
-            "cluster_order": cluster_order,
             "n_clusters": len(clusters),
             "predictions": predictions,
             "trajectory_map": trajectory_map,
@@ -372,15 +369,16 @@ def get_image(filename: str):
         headers={"Cache-Control": "max-age=3600"}
     )
 
-@app.get("/images/{movie_id}:{label}.jpeg")
-def get_image(movie_id: int, label: str):
+@app.get("/images/{movie_id}:{frame}:{bbox_str}.jpeg")
+def get_image(movie_id: int, frame: int, bbox_str: str):
     if movie_id not in movie_df.index:
         return HTTPException(404, f"Invalid movie id {movie_id}.")
 
-    label = label.replace("/", "")
+    bbox = [int(c) for c in bbox_str.replace("/", "").split("_")]
+    tag = img_tag(movie_id, frame, bbox)
+
     movie_dir = dir_data[movie_id]["path"]
-    file_name = f"kept-{movie_id}:{label}.jpeg"
-    file_path = os.path.join(movie_dir, "images", file_name)
+    file_path = os.path.join(movie_dir, "images", f"{tag}.jpeg")
 
     if not os.path.exists(file_path):
         return HTTPException(404, f"File not found.")
@@ -399,7 +397,7 @@ def get_cluster_data(movie_id: int, cluster_id: int, request: Request, response:
         return HTTPException(404, f"Invalid movie id {movie_id}.")
 
     movie_data = dir_data[movie_id]
-    data_cluster_id = movie_data["cluster_order"][cluster_id]
+    data_cluster_id = cluster_id
 
     # Default statuses for clusters and images if the database didn't have records
     DEFAULT_IMAGE_STATUS = "same"
@@ -460,7 +458,7 @@ def set_cluster_data(
         return HTTPException(404, f"Invalid movie id {movie_id}.")
 
     movie_data = dir_data[movie_id]
-    data_cluster_id = movie_data["cluster_order"][cluster_id]
+    data_cluster_id = cluster_id
 
     image_data_db = []
     for image in data.images:
