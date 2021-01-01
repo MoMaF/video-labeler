@@ -72,10 +72,12 @@
 
 .different-image {
   border: 3px solid #2023e2;
+  background-color: rgba(0, 0, 0, 0.4);
 }
 
 .invalid-image {
-  border: 3px solid #ff3333;
+  border: 3px solid #ffff33;
+  background-color: rgba(0, 0, 0, 0.4);
 }
 
 .faceview-info-header>h3 {
