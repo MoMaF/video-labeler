@@ -49,6 +49,36 @@ DATA_DIR = os.environ["DATA_DIR"].rstrip("/")
 FILMS_DIR = os.environ["FILMS_DIR"].rstrip("/")
 METADATA_DIR = os.environ["METADATA_DIR"].rstrip("/")
 
+def parse_actor_age(row):
+    """Parse actor age at the year when a movie was released.
+    """
+    birthday_str = row["birthday"]
+    movie_year = row["movie_year"]
+
+    if type(birthday_str) != str or type(movie_year) != int:
+        return None
+
+    year = 0
+    if len(birthday_str) == 10 or len(birthday_str) == 4:
+        birthday_str = birthday_str[-4:]
+        try:
+            year = int(birthday_str)
+        except:
+            pass
+    else:
+        birthday_str == birthday_str.strip(".0")
+        if len(birthday_str) == 4:
+            try:
+                year = int(birthday_str)
+            except:
+                pass
+
+    age = movie_year - year
+    if age >= 0 and age < 150:
+        return age
+    else:
+        return None
+
 def read_metadata(metadata_dir):
     # actors.csv contains data about movies, and which actors where in them.
     actors_path = os.path.join(metadata_dir, "actors.csv")
@@ -67,9 +97,25 @@ def read_metadata(metadata_dir):
     movie_df = movie_df.sort_values(by="basic_name").drop(columns=["basic_name"])
 
     # Movie to actors map
-    actors_df = df.set_index(["movie_id", "id"]).drop(columns="movie_name")
+    # actors_df = df.set_index(["movie_id", "id"]).drop(columns="movie_name")
+    # actors_df["id"] = actors_df.index.get_level_values("id")
+    actors_df = df.drop(columns=["movie_name", "birthplace"])
+
+    # In some movies, the same actor has multiple roles (rare, but possible)
+    # Put those cases into the same row in the actor_df
+    duplicated = actors_df.duplicated(subset=["movie_id", "id"])
+    for row in actors_df[duplicated].itertuples():
+        selected_rows = (actors_df.movie_id == row.movie_id) & (actors_df.id == row.id)
+        sub_df = actors_df[selected_rows]
+        combined_role = ", ".join(filter(lambda r: r, set(sub_df.role.tolist())))
+        actors_df.loc[sub_df.index, "role"] = combined_role
+    actors_df = actors_df[~duplicated]
+
+    # Finalize actors dataframe and set index [movie_id, actor_id]
+    actors_df["age"] = actors_df.apply(parse_actor_age, axis=1)
+    actors_df = actors_df.drop(columns=["birthday", "movie_year"])
+    actors_df = actors_df.set_index(["movie_id", "id"])
     actors_df["id"] = actors_df.index.get_level_values("id")
-    valid_actor_ids = set(actors_df.index.get_level_values("id"))
 
     # actor_images.csv links images to actors (and movies)
     # Columns: index,actor_id,movie_id,filename
@@ -301,6 +347,7 @@ def list_actors(movie_id: int):
             "id": actor.id,
             "name": actor.name,
             "role": actor.role,
+            "age": None if pd.isna(actor.age) else int(actor.age),
             "images": [f"images/actors/{name}" for name in image_names],
             "movie_count": movie_count[actor.id],
             "global_count": global_count[actor.id],

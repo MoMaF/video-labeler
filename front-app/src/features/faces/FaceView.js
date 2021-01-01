@@ -134,9 +134,10 @@ class FaceView extends Component {
       const actors = []
       for (let i = 0; i < rawActors.length; ++i) {
         const actor = rawActors[i]
+        const ageStr = (actor.age !== null) ? `, ${actor.age}y.` : ''
         actors.push({
           ...actor,
-          afterName: (actor.predicted ? " 🔮 (Predicted)" : ""),
+          afterName: ageStr + (actor.predicted ? " 🔮 (Predicted)" : ''),
           subTitle: actor.role + ` - ${actor.movieCount} (${actor.globalCount})`,
         })
         if (actor.id === selectedActorId) {
