@@ -172,6 +172,12 @@ class FaceView extends Component {
           name: "Frame " + imageData.frameIndex + ` (${timeStr})`,
           images: [imageData.fullFrameUrl],
         }
+        let hoverTitle = null
+        if (imageData.status === 'different') {
+          hoverTitle = 'Image marked as: "different actor" (blue)'
+        } else if (imageData.status === 'invalid') {
+          hoverTitle = 'Image marked as: "Not a face" (red)'
+        }
         return (
           <div
             className="faceimg-wrap"
@@ -179,7 +185,10 @@ class FaceView extends Component {
             onMouseEnter={this.handleElementEnter.bind(this, item)}
             onMouseLeave={this.handleElementLeave.bind(this, item)}
           >
-            <div className={`faceimg-border ${imageData.status}-image`}></div>
+            <div
+              className={`faceimg-border ${imageData.status}-image`}
+              title={hoverTitle}
+            ></div>
             <img
               src={`${backendUrl}/${imageData.url}`}
               className="faceimg"

@@ -71,12 +71,12 @@
 }
 
 .different-image {
-  border: 3px solid #2023e2;
+  border: 4px solid #206ae2;
   background-color: rgba(0, 0, 0, 0.4);
 }
 
 .invalid-image {
-  border: 3px solid #ffff33;
+  border: 4px solid #ff3333;
   background-color: rgba(0, 0, 0, 0.4);
 }
 
