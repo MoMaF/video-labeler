@@ -48,4 +48,4 @@ ___
 
 Contains independent scripts that are useful, but not needed in any way for the project to run.
 
-- `scripts/database_to_csv.py`: Example of how to retrieve a database dump (CSV) from the PostgreSQL database that is used in this project.
+- `extra/database_to_csv.py`: Example of how to retrieve a database dump (CSV) from the PostgreSQL database that is used in this project.
