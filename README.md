@@ -8,7 +8,7 @@ Recommended preinstalled software to run this locally:
 
 - Python 3.8 or greater. For the backend.
 - `npm` and `node` to run and eventually compile the frontend.
-- PostgreSQL 13 for the database.
+- PostgreSQL 13 for the database. The easy way here is using the [included Docker setup](./DATABASE.md).
 
 ___
 
