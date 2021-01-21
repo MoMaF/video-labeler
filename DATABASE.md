@@ -18,10 +18,11 @@ cd back/database
 sudo docker build -t postgresql .
 
 # 2. Create & start container
+# Replace /data/path/on/host with any folder on your host machine!
 sudo docker run -it \
     -p 5432:5432 \
     -e POSTGRES_PASSWORD=test \
-    -v "${HOME}/dev/video-labels/db-data":/var/lib/postgresql/data \
+    -v /data/path/on/host:/var/lib/postgresql/data \
     --name db \
     postgresql:latest
 ```
