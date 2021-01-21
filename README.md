@@ -2,7 +2,13 @@
 
 Video labeling backend and frontend for MoMaF. The backend reads many individual data folders `12345-data` (see: [extraction pipeline](https://github.com/MoMaF/facerec/tree/develop)) and provides a frontend for annotation of faces in movies.
 
-The backend uses FastAPI (Python). The frontend is a React-redux web application. The database uses PostgreSQL. Recommended: Python 3.9 and some recent version of node + npm.
+The backend uses FastAPI (Python). The frontend is a React-redux web application. The database uses PostgreSQL.
+
+Recommended preinstalled software to run this locally:
+
+- Python 3.8 or greater. For the backend.
+- `npm` and `node` to run and eventually compile the frontend.
+- PostgreSQL 13 for the database.
 
 ___
 
@@ -28,7 +34,7 @@ ___
 
 #### After doing the above, run the software:
 
-1. **Database:** setup a postgres database to run on `localhost` with a user `admin` and password `test`. The port should be the postgres default `5432`, and there should be a database named `db`. Initialize it with the schema defined at `database/create.sql`.
+1. **Database:** setup a postgres database to run on `localhost` with a user `admin` and password `test`. The port should be the postgres default `5432`, and there should be a database named `db`. Initialize it with the schema defined at `database/create.sql`. The [easiest way to do this is using Docker](./DATABASE.md).
 
 2. **Backend:** install python requirements (`back/requirements.txt`) and run the backend by: `python back/main.py`. This requires the environment variables `DATA_DIR`, `METADATA_DIR`, `FILMS_DIR` and `DB_PASSWORD`. Set `DB_PASSWORD=test` (your local postgres password). Run the backend by `python back/main.py`. This will run the backend at localhost:5000.
 
