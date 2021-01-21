@@ -41,3 +41,11 @@ ___
 If everything worked out, the frontend should look something like:
 
 ![Labeler front](https://gist.githubusercontent.com/ekreutz/249a6cbe4203194e66b846057f6415bf/raw/labeler_main.png)
+
+___
+
+# Folder `extra`
+
+Contains independent scripts that are useful, but not needed in any way for the project to run.
+
+- `scripts/database_to_csv.py`: Example of how to retrieve a database dump (CSV) from the PostgreSQL database that is used in this project.
