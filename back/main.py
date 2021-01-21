@@ -245,13 +245,16 @@ def read_datadirs(data_dir):
             assert len(predictions) == len(clusters), "Predictions not equal to clusters!"
 
         # Expect video file with the same name as directory (+ extension)
-        assert movie_id in movie_path_map, f"Movie file not found for: {movie_id}"
-        movie_path = movie_path_map[movie_id]
-
-        # Read movie fps from file so that frontend can compute hh:mm:ss for frames!
-        cap = cv2.VideoCapture(movie_path)
-        fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
-        cap.release()
+        if movie_id in movie_path_map:
+            movie_path = movie_path_map[movie_id]
+            # Read movie fps from file so that frontend can compute hh:mm:ss for frames!
+            cap = cv2.VideoCapture(movie_path)
+            fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
+            cap.release()
+        else:
+            fps = 25.0
+            movie_path = None
+            print(f"Movie file not found for: {movie_id}")
 
         data = {
             "id": movie_id,
@@ -293,7 +296,7 @@ def get_movie_data(movie_ids: List[int], movie_counts):
     } for id in movie_ids]
 
 @app.get("/api/movies/{movie_id}")
-def get_movie(movie_id: int):
+def get_movie(movie_id: int, response: Response):
     """Get metadata about a single movie.
     """
     movie_counts = db_client.get_annotation_counts(movie_id)
@@ -307,7 +310,7 @@ def get_movie(movie_id: int):
     movie_data = get_movie_data([movie_id], movie_counts)
 
     if movie_data is None:
-        return HTTPException(404, f"No such movie {movie_id}.")
+        raise HTTPException(404, error=f"No such movie {movie_id}.")
 
     return movie_data[0]
 
@@ -357,27 +360,32 @@ def list_actors(movie_id: int):
 @app.get("/images/frames/{movie_id}/{frame_index}_{box}.jpeg")
 def get_frame(movie_id: int, frame_index: int, box: str):
     if not movie_id in dir_data:
-        return HTTPException(404, f"No such movie {movie_id}.")
+        raise HTTPException(404, error=f"No such movie {movie_id}.")
+
+    if dir_data[movie_id]["movie_path"] is None:
+        # This happens if the FILMS_DIR environment variable was improperly set,
+        # or if no movie file (eg. mp4, etc.) was found in FILMS_DIR for this film.
+        raise HTTPException(500, error=f"No frame data for film.")
 
     cap = cv2.VideoCapture(dir_data[movie_id]["movie_path"])
 
     if not cap.set(cv2.CAP_PROP_POS_FRAMES, frame_index):
-        return HTTPException(400, "Bad request!")
+        raise HTTPException(400, error="Bad request!")
 
     box_split = box.split("-")
     try:
         box_split = [int(c) for c in box_split]
     except:
-        return HTTPException(400, "Bad request!")
+        raise HTTPException(400, error="Bad request!")
 
     if len(box_split) != 4:
-        return HTTPException(400, "Bad request!")
+        raise HTTPException(400, error="Bad request!")
 
     ret, frame = cap.read()
     cap.release()
 
     if not ret:
-        return HTTPException(500, "Error reading movie.")
+        raise HTTPException(500, error="Error reading movie.")
 
     # Draw bounding box on frame to highlight actor (color is BGR)
     color = (255, 255, 255)
@@ -408,7 +416,7 @@ def get_image(filename: str):
     file_path = os.path.join(METADATA_DIR, "actor_images", filename)
 
     if not os.path.exists(file_path):
-        return HTTPException(404, f"File not found.")
+        raise HTTPException(404, error=f"File not found.")
 
     return FileResponse(
         file_path,
@@ -419,7 +427,7 @@ def get_image(filename: str):
 @app.get("/images/{movie_id}:{frame}:{bbox_str}.jpeg")
 def get_image(movie_id: int, frame: int, bbox_str: str):
     if movie_id not in movie_df.index:
-        return HTTPException(404, f"Invalid movie id {movie_id}.")
+        raise HTTPException(404, error=f"Invalid movie id {movie_id}.")
 
     bbox = [int(c) for c in bbox_str.replace("/", "").split("_")]
     tag = img_tag(movie_id, frame, bbox)
@@ -428,7 +436,7 @@ def get_image(movie_id: int, frame: int, bbox_str: str):
     file_path = os.path.join(movie_dir, "images", f"{tag}.jpeg")
 
     if not os.path.exists(file_path):
-        return HTTPException(404, f"File not found.")
+        raise HTTPException(404, error=f"File not found.")
 
     return FileResponse(
         file_path,
@@ -441,7 +449,7 @@ def get_cluster_data(movie_id: int, cluster_id: int, request: Request, response:
     """Main endpoint to get all data of a cluster.
     """
     if movie_id not in movie_df.index:
-        return HTTPException(404, f"Invalid movie id {movie_id}.")
+        raise HTTPException(404, error=f"Invalid movie id {movie_id}.")
 
     movie_data = dir_data[movie_id]
     data_cluster_id = cluster_id
@@ -502,7 +510,7 @@ def set_cluster_data(
     """Main endpoint to save cluster data to persistent storage. Eg. assign label.
     """
     if movie_id not in dir_data:
-        return HTTPException(404, f"Invalid movie id {movie_id}.")
+        raise HTTPException(404, error=f"Invalid movie id {movie_id}.")
 
     movie_data = dir_data[movie_id]
     data_cluster_id = cluster_id
