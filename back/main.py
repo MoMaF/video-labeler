@@ -232,7 +232,7 @@ def read_datadirs(data_dir):
             clusters[ci]["n_trajectories"] += 1
 
             # Uniquely map (frame, *box) -> trajectory id for every shown image
-            trajectory_map |= {tuple([frame, *box]): ti for frame, box in image_bbs}
+            trajectory_map.update({tuple([frame, *box]): ti for frame, box in image_bbs})
 
         # Read per-cluster predictions
         with open(predictions_file, "r") as f:
