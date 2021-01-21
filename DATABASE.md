@@ -6,20 +6,18 @@ The easiest way to launch a local PostgreSQL database for the `video-labeler` is
 
 Using Docker for this is not required, of course. Any local PostgreSQL setup that adheres to the database/schema requirements will do.
 
-### Build the database Docker image
+### Setting up the PostgreSQL container
+
+After running the commands seen here, your PostgreSQL setup is done, and the `video-labeler` backend will be able to connect. Kill the container at any time using CTRL-C. Omit `sudo` if using macOS.
+
+Commands:
 
 ```
-# Omit sudo if using macOS
+# 1. Build image
 cd back/database
 sudo docker build -t postgresql .
-```
 
-### Run the Docker image
-
-After running the command below, your PostgreSQL setup is done, and the `video-labeler` backend will be able to connect. Kill the container using CTRL-C.
-
-```
-# Omit sudo if using macOS
+# 2. Create & start container
 sudo docker run -it \
     -p 5432:5432 \
     -e POSTGRES_PASSWORD=test \
@@ -28,7 +26,7 @@ sudo docker run -it \
     postgresql:latest
 ```
 
-### Rerunning after closing
+### Extra: rerunning after closing
 
 The previous step created a container named `db`. After the container was killed, it can be restarted the next time using:
 
