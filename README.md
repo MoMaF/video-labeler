@@ -28,7 +28,7 @@ ___
 
 #### After doing the above, run the software:
 
-1. **Database:** setup a postgres database to run on localhost with a user `admin` and password `test`. Initialize it with the schema defined at `database/create.sql`.
+1. **Database:** setup a postgres database to run on `localhost` with a user `admin` and password `test`. The port should be the postgres default `5432`, and there should be a database named `db`. Initialize it with the schema defined at `database/create.sql`.
 
 2. **Backend:** install python requirements (`back/requirements.txt`) and run the backend by: `python back/main.py`. This requires the environment variables `DATA_DIR`, `METADATA_DIR`, `FILMS_DIR` and `DB_PASSWORD`. Set `DB_PASSWORD=test` (your local postgres password). Run the backend by `python back/main.py`. This will run the backend at localhost:5000.
 
