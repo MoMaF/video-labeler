@@ -1,6 +1,6 @@
 fastapi
 aiofiles
 pandas
-psycopg2
+psycopg2-binary
 opencv-python
 uvicorn
