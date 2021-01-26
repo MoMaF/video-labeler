@@ -4,3 +4,4 @@ pandas
 psycopg2-binary
 opencv-python
 uvicorn
+pymediainfo  # <-- This requires a native dependency: mediainfo. Check README.

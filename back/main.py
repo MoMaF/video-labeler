@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import List
 import os
 import glob
 import json
@@ -6,12 +6,12 @@ import signal
 import io
 import base64
 
-from fastapi import Body, FastAPI, HTTPException, Request, Response
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.encoders import jsonable_encoder
 from fastapi.responses import Response, FileResponse, StreamingResponse
 import pandas as pd
 import cv2
+from pymediainfo import MediaInfo
 
 from database_client import DatabaseClient
 from models.cluster_labels import ClusterLabels
@@ -43,6 +43,9 @@ ITEMS_PER_TRAJECTORY = 2
 
 # Send predictions to frontend if probability is above this
 PREDICTION_MIN_P = 0.40
+
+# Max resolution (width or height) when sending a frame to the frontend
+FRAME_MAX_RES = 512
 
 # TODO: move these to config
 DATA_DIR = os.environ["DATA_DIR"].rstrip("/")
@@ -223,6 +226,7 @@ def read_datadirs(data_dir):
                     "n_total_images": 0,  # Total images in related trajectories
                 }
             trajectory = trajectories[ti]
+            assert trajectory["index"] == ti, "Trajectory implicit index wrong?"
             # TODO: smarter selection of images to show?
             image_bbs = split_evenly(trajectory["image_bbs"], ITEMS_PER_TRAJECTORY)
             # Tuples in the list are: (trajectory_id, frame_index, bounding_box)
@@ -244,15 +248,33 @@ def read_datadirs(data_dir):
             }
             assert len(predictions) == len(clusters), "Predictions not equal to clusters!"
 
-        # Expect video file with the same name as directory (+ extension)
         if movie_id in movie_path_map:
             movie_path = movie_path_map[movie_id]
             # Read movie fps from file so that frontend can compute hh:mm:ss for frames!
             cap = cv2.VideoCapture(movie_path)
             fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
+
+            # Parse pixel aspect ratio information from movie.
+            video_info_json_str = MediaInfo.parse(movie_path, output="JSON")
+            tracks = json.loads(video_info_json_str)["media"]["track"]
+            video_info = next(track for track in tracks if track["@type"].lower() == "video")
+            dar_string = video_info["DisplayAspectRatio_String"]
+            if ":" in dar_string:
+                num, den = [float(s) for s in dar_string.split(":")]
+                dar = num / den
+            else:
+                dar = float(dar_string)
+            height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            width = int(dar * height)
+            resolution = (width, height)
+            # Compute a scaling factor, that is used to scale frames down when sending
+            # to the frontend
+            scaling_factor = min(1.0, FRAME_MAX_RES / max(width, height))
             cap.release()
         else:
             fps = 25.0
+            scaling_factor = 1.0
+            resolution = (0, 0)
             movie_path = None
             print(f"Movie file not found for: {movie_id}")
 
@@ -265,6 +287,8 @@ def read_datadirs(data_dir):
             "predictions": predictions,
             "trajectory_map": trajectory_map,
             "fps": fps,
+            "resolution": resolution,
+            "scaling_factor": scaling_factor,
         }
         dir_data[movie_id] = data
 
@@ -387,19 +411,19 @@ def get_frame(movie_id: int, frame_index: int, box: str):
     if not ret:
         raise HTTPException(500, error="Error reading movie.")
 
+    w, h = dir_data[movie_id]["resolution"]
+    scale = dir_data[movie_id]["scaling_factor"]
+    scaled_w = round(scale * w)
+    scaled_h = round(scale * h)
+    box = [round(c * scale) for c in box_split]
+
+    # Scale frame if needed to correct size
+    frame = cv2.resize(frame, (scaled_w, scaled_h), interpolation=cv2.INTER_AREA)
+
     # Draw bounding box on frame to highlight actor (color is BGR)
     color = (255, 255, 255)
-    thickness = 2
-    frame = cv2.rectangle(frame, tuple(box_split[:2]), tuple(box_split[2:]), color, thickness)
-
-    # Resize frames to that we can send them faster
-    MAX_SIZE = 512
-    max_frame_dim = max(frame.shape[:2])
-    if max_frame_dim > MAX_SIZE:
-        scale = MAX_SIZE / max_frame_dim
-        width, height = int(scale * frame.shape[1]), int(scale * frame.shape[0])
-        dim = (width, height)
-        frame = cv2.resize(frame, dim, interpolation=cv2.INTER_AREA)
+    thickness = 1
+    frame = cv2.rectangle(frame, tuple(box[:2]), tuple(box[2:]), color, thickness)
 
     # Encode into jpeg in-memory
     encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 75]

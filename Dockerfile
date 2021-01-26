@@ -18,6 +18,7 @@ RUN apt-get update -y && apt-get install -y \
     ffmpeg \
     libsm6 \
     libxext6 \
+    mediainfo \
     nginx
 
 COPY --from=front /front-app/build /var/www/build
