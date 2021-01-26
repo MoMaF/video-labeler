@@ -11,7 +11,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, FileResponse, StreamingResponse
 import pandas as pd
 import cv2
-from pymediainfo import MediaInfo
 
 from database_client import DatabaseClient
 from models.cluster_labels import ClusterLabels
@@ -125,7 +124,11 @@ def read_metadata(metadata_dir):
     actor_images_path = os.path.join(metadata_dir, "actor_images.csv")
     actor_images_df = pd.read_csv(actor_images_path, index_col="actor_id").sort_index()
 
-    return movie_df, actors_df, actor_images_df
+    # Read aspect ratios for movies
+    aspect_ratios_path = os.path.join(metadata_dir, "aspect_ratios.csv")
+    aspects_df = pd.read_csv(aspect_ratios_path, index_col="filename").sort_index()
+
+    return movie_df, actors_df, actor_images_df, aspects_df
 
 def img_tag(movie_id: int, frame: int, box: List[int]):
     """Get a 'standard' image tag as used by the face recognition stack.
@@ -253,19 +256,10 @@ def read_datadirs(data_dir):
             # Read movie fps from file so that frontend can compute hh:mm:ss for frames!
             cap = cv2.VideoCapture(movie_path)
             fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
-
-            # Parse pixel aspect ratio information from movie.
-            video_info_json_str = MediaInfo.parse(movie_path, output="JSON")
-            tracks = json.loads(video_info_json_str)["media"]["track"]
-            video_info = next(track for track in tracks if track["@type"].lower() == "video")
-            dar_string = video_info["DisplayAspectRatio_String"]
-            if ":" in dar_string:
-                num, den = [float(s) for s in dar_string.split(":")]
-                dar = num / den
-            else:
-                dar = float(dar_string)
-            height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-            width = int(dar * height)
+            # Read display aspect ratio-adjusted frame resolution
+            basename = os.path.basename(movie_path)
+            width = int(aspects_df.at[basename, "display_width"])
+            height = int(aspects_df.at[basename, "display_height"])
             resolution = (width, height)
             # Compute a scaling factor, that is used to scale frames down when sending
             # to the frontend
@@ -294,7 +288,7 @@ def read_datadirs(data_dir):
 
     return dir_data
 
-movie_df, actors_df, actor_images_df = read_metadata(METADATA_DIR)
+movie_df, actors_df, actor_images_df, aspects_df = read_metadata(METADATA_DIR)
 valid_actor_ids = set(actors_df.index.get_level_values("id"))
 dir_data = read_datadirs(DATA_DIR)
 
