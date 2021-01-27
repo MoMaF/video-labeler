@@ -122,7 +122,8 @@ def read_metadata(metadata_dir):
     # actor_images.csv links images to actors (and movies)
     # Columns: index,actor_id,movie_id,filename
     actor_images_path = os.path.join(metadata_dir, "actor_images.csv")
-    actor_images_df = pd.read_csv(actor_images_path, index_col="actor_id").sort_index()
+    actor_images_df = pd.read_csv(actor_images_path, index_col="actor_id")
+    actor_images_df = actor_images_df[actor_images_df.n_detections > 0].sort_index()
 
     # Read aspect ratios for movies
     aspect_ratios_path = os.path.join(metadata_dir, "aspect_ratios.csv")
@@ -359,7 +360,7 @@ def list_actors(movie_id: int):
     for actor in df.itertuples():
         image_names = []
         if actor.id in actor_images_df.index:
-            sub_df = actor_images_df.loc[[actor.id]]
+            sub_df = actor_images_df.loc[[actor.id]].sort_values("n_detections")
             same_movie = (sub_df.movie_id == movie_id)
             # Add images from the correct movie first.
             image_names += sub_df[same_movie].filename.tolist()
