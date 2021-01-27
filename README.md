@@ -24,7 +24,7 @@ Data from the [extraction pipeline](https://github.com/MoMaF/facerec/tree/develo
 
 #### `METADATA_DIR`: Data and images of actors.
 
-Metadata with information about actors, and archived images of actors. Export path as `export METADATA_DIR="/path/to/the/metadata"`. Download here: [link](https://drive.google.com/file/d/1Z0uWKCI0mqF9YmhAJiYZkSEP4WRMoY5X/view?usp=sharing).
+Metadata with information about actors, and archived images of actors. Export path as `export METADATA_DIR="/path/to/the/metadata"`. Download here: [link](https://drive.google.com/file/d/1Mk1mgH11Be16kF031yNdFjnpEImK5w4E/view?usp=sharing).
 
 #### `FILMS_DIR`: Raw video files of the movies at hand.
 
