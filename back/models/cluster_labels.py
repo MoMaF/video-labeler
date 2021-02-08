@@ -8,7 +8,7 @@ class ImageData(BaseModel):
 class ClusterLabels(BaseModel):
     """Model for validating post requests that assign labels to clusters and images.
     """
-    label: Optional[int]
+    label: Optional[str]
     images: List[ImageData]
     time: int
     status: str  # 'labeled', 'discarded', 'postponed', 'mixed'

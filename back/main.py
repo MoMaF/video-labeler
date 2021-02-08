@@ -98,11 +98,8 @@ def read_metadata(metadata_dir):
     movie_df["basic_name"] = movie_df.name.apply(strip_special)
     movie_df = movie_df.sort_values(by="basic_name").drop(columns=["basic_name"])
 
-    # Movie to actors map
-    # actors_df = df.set_index(["movie_id", "id"]).drop(columns="movie_name")
-    # actors_df["id"] = actors_df.index.get_level_values("id")
+    # actors_df: movie to actors map
     actors_df = df.drop(columns=["movie_name", "birthplace"])
-
     # In some movies, the same actor has multiple roles (rare, but possible)
     # Put those cases into the same row in the actor_df
     duplicated = actors_df.duplicated(subset=["movie_id", "id"])
@@ -112,6 +109,7 @@ def read_metadata(metadata_dir):
         combined_role = ", ".join(filter(lambda r: r, set(sub_df.role.tolist())))
         actors_df.loc[sub_df.index, "role"] = combined_role
     actors_df = actors_df[~duplicated]
+    actors_df["id"] = actors_df["id"].astype(str)
 
     # Finalize actors dataframe and set index [movie_id, actor_id]
     actors_df["age"] = actors_df.apply(parse_actor_age, axis=1)
@@ -122,7 +120,9 @@ def read_metadata(metadata_dir):
     # actor_images.csv links images to actors (and movies)
     # Columns: index,actor_id,movie_id,filename
     actor_images_path = os.path.join(metadata_dir, "actor_images.csv")
-    actor_images_df = pd.read_csv(actor_images_path, index_col="actor_id")
+    actor_images_df = pd.read_csv(actor_images_path)
+    actor_images_df["actor_id"] = actor_images_df.actor_id.astype(str)
+    actor_images_df = actor_images_df.set_index("actor_id")
     actor_images_df = actor_images_df[actor_images_df.n_detections > 0].sort_index()
 
     # Read aspect ratios for movies
@@ -209,7 +209,6 @@ def read_datadirs(data_dir):
                     if file_name in images_set:
                         valid_boxes.append((frame, box))
                 t["image_bbs"] = valid_boxes
-                assert len(valid_actor_ids) > 0, "Valid boxes length?"
 
         # Read clusters corresponing to each trajectory
         with open(clusters_file, "r") as f:
@@ -247,7 +246,7 @@ def read_datadirs(data_dir):
             predictions = json.load(f)["predictions"]
             # Convert keys to integers (JSON only has string keys)
             predictions = {
-                int(cluster_id): {int(actor_id): p for actor_id, p in cluster_preds.items()}
+                int(cluster_id): {actor_id: p for actor_id, p in cluster_preds.items()}
                 for cluster_id, cluster_preds in predictions.items()
             }
             assert len(predictions) == len(clusters), "Predictions not equal to clusters!"
@@ -290,7 +289,6 @@ def read_datadirs(data_dir):
     return dir_data
 
 movie_df, actors_df, actor_images_df, aspects_df = read_metadata(METADATA_DIR)
-valid_actor_ids = set(actors_df.index.get_level_values("id"))
 dir_data = read_datadirs(DATA_DIR)
 
 # Filter movies to those that have data

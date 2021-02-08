@@ -32,7 +32,7 @@ class DatabaseClient:
             username (str): user name
             movie_id (int): movie id
             cluster_id (int): movie-specific cluster index
-            label (int): cluster label (equals actor id)
+            label (str): cluster label (actor id string, or object, etc.)
             images (List): tuples of images + status + t_id
                 Example: [("image_tag", "same", trajectory_id int), ...]
             status (str): cluster status: 'labeled', 'discarded', 'postponed', 'mixed'

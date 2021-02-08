@@ -11,7 +11,7 @@ CREATE TABLE clusters (
 	"movie_id"			INTEGER NOT NULL,
 	"cluster_id"		INTEGER NOT NULL,
 	"status"			cluster_status NOT NULL,
-	"label"				INTEGER, -- label = actor id
+	"label"				VARCHAR(64),
 	"n_images"			INTEGER NOT NULL,
 	"created_on"		TIMESTAMP NOT NULL DEFAULT NOW(),
 	"processing_time"	INTEGER NOT NULL
