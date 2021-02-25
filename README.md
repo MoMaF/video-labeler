@@ -46,7 +46,7 @@ ___
 
 If everything worked out, the frontend should look something like:
 
-![Labeler front](https://gist.githubusercontent.com/ekreutz/249a6cbe4203194e66b846057f6415bf/raw/labeler_main.png)
+![Labeler front](/readme-images/video-labeler-frontend.png)
 
 ___
 
