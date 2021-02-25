@@ -20,11 +20,11 @@ ___
 
 #### `DATA_DIR`: Extracted film data.
 
-Data from the [extraction pipeline](https://github.com/MoMaF/facerec/tree/develop). This means, 1 or more samples of extracted film data with a directory such as `12345-data`. Put all of these folders in a parent directory of your choosing and export its path as `export DATA_DIR="/path/to/the/folder"`. A full example can be found here: [113528-data](https://drive.google.com/file/d/1DjILPXwae9GcKkzVusGcwMTGNx0DlXzm/view?usp=sharing).
+Data from the [extraction pipeline](https://github.com/MoMaF/facerec/tree/develop). This means, 1 or more samples of extracted film data with a directory such as `12345-data`. Put all of these folders in a parent directory of your choosing and export its path as `export DATA_DIR="/path/to/the/folder"`. A full example can be found here: [113528-data](https://drive.google.com/file/d/1K9p_fiLbMooNMCRjEWktg_M4CVg1vMua/view?usp=sharing).
 
 #### `METADATA_DIR`: Data and images of actors.
 
-Metadata with information about actors, and archived images of actors. Export path as `export METADATA_DIR="/path/to/the/metadata"`. Download here: [link](https://drive.google.com/file/d/1dEziNOTIZUGodcpveCHFn20K8IVflwuG/view?usp=sharing).
+Metadata with information about actors, and archived images of actors. Export path as `export METADATA_DIR="/path/to/the/metadata"`. Download here: [link](https://drive.google.com/file/d/1K9p_fiLbMooNMCRjEWktg_M4CVg1vMua/view?usp=sharing).
 
 #### `FILMS_DIR`: Raw video files of the movies at hand.
 
