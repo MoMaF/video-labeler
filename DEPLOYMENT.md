@@ -154,11 +154,6 @@ Copy/move the files as follows:
 ../my-cool-vm.example.com/privkey1.pem --> /media/volume/tls/privkey.pem
 ../my-cool-vm.example.com/fullchain1.pem --> /media/volume/tls/fullchain.pem
 dhparam.pem --> /media/volume/tls/dhparam.pem
-
-
-chain.pem -> ../../archive/my-cool-vm.example.com/chain1.pem
-fullchain.pem -> ../../archive/my-cool-vm.example.com/fullchain1.pem
-privkey.pem -> ../../archive/my-cool-vm.example.com/privkey1.pem
 ```
 
 5. Create a folder where the database can store its binary data: `/media/volume/postgres-data`
